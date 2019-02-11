@@ -6,10 +6,10 @@ IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARA
 std::unique_ptr<REFramework> gREFramework {};
 
 REFramework::REFramework()
-	: vdIsInControl(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x707A510, {0x408, 0xD8, 0x18, 0x20, 0x130}),
-	  vdMSTime     (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACAE0, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x18}),
-	  vdPlayerMaxHP(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACA88, {0x50, 0x20, 0x54}),
-	  vdPlayerHP   (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACA88, {0x50, 0x20, 0x58})
+	: mVDIsInControl(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x707A510, {0x408, 0xD8, 0x18, 0x20, 0x130}),
+	  mVDMSTime     (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACAE0, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x18}),
+	  mVDPlayerMaxHP(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACA88, {0x50, 0x20, 0x54}),
+	  mVDPlayerHP   (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACA88, {0x50, 0x20, 0x58})
 {
 	mInit = false;
 	mStatWnd = false;
@@ -17,7 +17,15 @@ REFramework::REFramework()
 	mInputHooked = false;
 	mStatWndCorner = 0;
 
-	//EntityHPList.reserve(MAX_ENTITY_COUNT);
+	ZeroMemory(&mREData, sizeof(RE_DATA));
+
+	mEntityMaxHPList.reserve(MAX_ENTITY_COUNT);
+	mEntityHPList.reserve(MAX_ENTITY_COUNT);
+	for (DWORD i = 0; i < MAX_ENTITY_COUNT; ++i)
+	{
+		mEntityMaxHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x707B758, {0x80 + (i * 0x8), 0x88, 0x18, 0x1A0, 0x54}));
+		mEntityHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x707B758, {0x80 + (i * 0x8), 0x88, 0x18, 0x1A0, 0x58}));
+	}
 	
 	// hook
 	std::cout << "Hooking D3D11..." << std::endl;
@@ -44,7 +52,8 @@ REFramework::REFramework()
 
 REFramework::~REFramework()
 {
-
+	if (this->mUpdateDataThreadHnd)
+		TerminateThread(this->mUpdateDataThreadHnd, 0);
 }
 
 bool REFramework::OnMessage(HWND wnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -85,6 +94,65 @@ void REFramework::OnDirectInputKeys(const std::array<uint8_t, 256> &Keys)
 	}
 
 	mLastKeys = Keys;
+}
+
+DWORD WINAPI REFramework::StartUpdateDataThread(LPVOID lpParam)
+{
+	REFramework* pREFramework = static_cast<REFramework*>(lpParam);
+	return pREFramework->UpdateData();
+}
+
+DWORD REFramework::UpdateData()
+{
+	do
+	{
+		static bool bData;
+		static DWORD i;
+		static RE_DATA TmpData;
+
+		ZeroMemory(&TmpData, sizeof(RE_DATA));
+
+		mVDIsInControl.GetData(TmpData.bIsInControl);
+
+		if (TmpData.bIsInControl == 1)
+		{
+			mVDPlayerMaxHP.GetData(TmpData.iPlayerMaxHP);
+			mVDPlayerHP.GetData(TmpData.iPlayerHP);
+			mVDMSTime.GetData(TmpData.qwTime);
+
+			for (i = 0; i < MAX_ENTITY_COUNT; ++i)
+			{
+				if (mEntityMaxHPList[i].GetData(TmpData.EntityMaxHPList[i]) == false)
+				{
+					mEntityMaxHPList[i].InvalidateDataAddr();
+					break;
+				}
+
+				bData = mEntityHPList[i].GetData(TmpData.EntityHPList[i]);
+
+				mEntityMaxHPList[i].InvalidateDataAddr();
+				mEntityHPList[i].InvalidateDataAddr();
+
+				if (bData == false)
+					break;
+
+				++TmpData.iEntityCount;
+			}
+		}
+
+		mDataMutex.lock();
+		memcpy(&mREData, &TmpData, sizeof(RE_DATA));
+		mDataMutex.unlock();
+
+		mVDPlayerMaxHP.InvalidateDataAddr();
+		mVDPlayerHP.InvalidateDataAddr();
+		mVDMSTime.InvalidateDataAddr();
+		mVDIsInControl.InvalidateDataAddr();
+
+		Sleep(UPDATE_DATA_DELAY);
+	} while (1);
+
+	ExitThread(0);
 }
 
 //--------------------------------------------------------------------------------------
@@ -303,6 +371,9 @@ bool REFramework::Init()
 	mInit = true;
 	mStatWnd = true;
 
+	if (this->mUpdateDataThreadHnd == nullptr)
+		this->mUpdateDataThreadHnd = CreateThread(nullptr, 0, this->StartUpdateDataThread, this, 0, nullptr);
+
 	return true;
 }
 
@@ -394,78 +465,105 @@ void REFramework::DrawUI()
 	std::lock_guard<std::mutex> guard(mInputMutex);
 
 	auto& io = ImGui::GetIO();
+	auto& style = ImGui::GetStyle();
 
-	if (mStatWnd)
+	io.WantCaptureKeyboard = false;
+	io.WantCaptureMouse = false;
+	io.MouseDrawCursor = false;
+	io.ConfigFlags = ImGuiConfigFlags_NoMouse;
+
+	if (mStatWnd && mStatWndCorner != -1)
 	{
-		//io.WantCaptureMouse = true;
-		//io.MouseDrawCursor = true;
-
 		ImVec2 WndPos = ImVec2((mStatWndCorner & 1) ? io.DisplaySize.x - STATWND_DIST : STATWND_DIST, (mStatWndCorner & 2) ? io.DisplaySize.y - STATWND_DIST : STATWND_DIST);
 		ImVec2 WndPosPivot = ImVec2((mStatWndCorner & 1) ? 1.0f : 0.0f, (mStatWndCorner & 2) ? 1.0f : 0.0f);
 
-		if (mStatWndCorner != -1)
-			ImGui::SetNextWindowPos(WndPos, ImGuiCond_Always, WndPosPivot);
+		style.FrameRounding = 2.0f;
+		ImGui::SetNextWindowSize(ImVec2(215.0f, 0.0f));
+		ImGui::SetNextWindowBgAlpha(0.30f);
+		ImGui::SetNextWindowPos(WndPos, ImGuiCond_Always, WndPosPivot);
 
-		ImGui::SetNextWindowBgAlpha(0.30f); // Transparent background
 		if (ImGui::Begin("RE2Tool", &mStatWnd, (mStatWndCorner != -1 ? ImGuiWindowFlags_NoMove : 0) | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav))
 		{
-			// TEST AREA
-			BYTE bIsInControl = 0;
-			INT iPlayerMaxHP = 0;
-			INT iPlayerHP = 0;
-			QWORD qwTime = 0;
+			static char buf[32];
 
-			vdIsInControl.GetData(bIsInControl);
-			if (bIsInControl == 1)
+			if (ImGui::CollapsingHeader("Game performance", ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				vdPlayerMaxHP.GetData(iPlayerMaxHP);
-				vdPlayerHP.GetData(iPlayerHP);
-				vdMSTime.GetData(qwTime);
-			}
-			else
-			{
-				vdPlayerMaxHP.InvalidateDataAddr();
-				vdPlayerHP.InvalidateDataAddr();
-				vdMSTime.InvalidateDataAddr();
-			}
-			// END OF TEST AREA
+				static float fps = 0.0f;
+				static float max_fps = START_MAX_FPS;
+				static int max_fps_count = 0;
+				static float fps_list[90] = {0};
+				static int list_index = 0;
+				static double time_start = 0.0;
+				static double time_now = 0.0;
+				static double time_diff = 0.0;
 
-			ImGui::Text("Time: %i", qwTime);
+				fps = io.Framerate;
 
-			ImGui::Text("Health:");
-			ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+				//fps_list[list_index] = fps;
+				//list_index = (list_index + 1) % IM_ARRAYSIZE(fps_list);
 
-			char buf[32];
-			sprintf_s(buf, "%d/%d", iPlayerHP, iPlayerMaxHP);
-			ImGui::ProgressBar(static_cast<float>(iPlayerHP), ImVec2(120.0f, 15.0f), buf);
-
-			if (bIsInControl == 1)
-			{
-				DWORD i;
-				INT iEntityMaxHP;
-				INT iEntityHP;
-				for (i = 0; i < MAX_ENTITY_COUNT; ++i)
+				if (time_start == 0.0)
+					time_start = ImGui::GetTime();
+				else
 				{
-					iEntityMaxHP = 0;
-					iEntityHP = 0;
+					time_now = ImGui::GetTime();
+					time_diff = time_now - time_start;
+					if (time_diff >= GRAPH_REFRESH_INTERVAL)
+					{
+						time_start = 0.0;
+						fps_list[list_index] = fps;
+						list_index = (list_index + 1) % IM_ARRAYSIZE(fps_list);
 
-					vdEntityMaxHP.SetDataPtr(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x707B758, {0x80 + (i * 0x8), 0x88, 0x18, 0x1A0, 0x54});
-					if (vdEntityMaxHP.GetData(iEntityMaxHP) == false)
-						break;
+						if (fps > max_fps)
+						{
+							++max_fps_count;
+							if (max_fps_count >= MAX_FPS_COUNT)
+							{
+								max_fps = fps;
+								max_fps_count = 0;
+							}
+						}
+					}
+				}
+				sprintf_s(buf, "fps: %.2f", fps);
+				ImGui::PlotLines("", fps_list, IM_ARRAYSIZE(fps_list), list_index, buf, 0.0f, max_fps, ImVec2(198.0f, 60.0f), 4, true);
+			}
 
-					vdEntityHP.SetDataPtr(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x707B758, {0x80 + (i * 0x8), 0x88, 0x18, 0x1A0, 0x58});
-					if (vdEntityHP.GetData(iEntityHP) == false)
-						break;
+			if (mREData.bIsInControl == 1)
+			{
+				static int i;
+				static RE_DATA TmpData;
+				static bool bHeaderOpen = false;
+				static float fProgress = 0.0f;
 
+				mDataMutex.lock();
+				memcpy(&TmpData, &mREData, sizeof(RE_DATA));
+				mDataMutex.unlock();
+
+				if (ImGui::CollapsingHeader("Player status", ImGuiTreeNodeFlags_DefaultOpen))
+				{
+					ImGui::Text("Time  : %i", TmpData.qwTime);
+					ImGui::Text("Health:");
+					ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+
+					sprintf_s(buf, "%d/%d", TmpData.iPlayerHP, TmpData.iPlayerMaxHP);
+					fProgress = static_cast<float>(TmpData.iPlayerHP) / static_cast<float>(TmpData.iPlayerMaxHP);
+					ImGui::ProgressBar(fProgress, ImVec2(-1.0f, 15.0f), buf);
+				}
+
+				for (i = 0; i < TmpData.iEntityCount; ++i)
+				{
 					if (i == 0)
 					{
-						ImGui::Separator();
-						ImGui::Text("Enemies");
-						ImGui::Separator();
+						bHeaderOpen = ImGui::CollapsingHeader("Entities health", ImGuiTreeNodeFlags_DefaultOpen);
 					}
 
-					sprintf_s(buf, "%d/%d", iEntityHP, iEntityMaxHP);
-					ImGui::ProgressBar(static_cast<float>(iEntityHP), ImVec2(-1.0f, 15.0f), buf);
+					if (bHeaderOpen)
+					{
+						sprintf_s(buf, "%d/%d", TmpData.EntityHPList[i], TmpData.EntityMaxHPList[i]);
+						fProgress = static_cast<float>(TmpData.EntityHPList[i]) / static_cast<float>(TmpData.EntityMaxHPList[i]);
+						ImGui::ProgressBar(fProgress, ImVec2(-1.0f, 15.0f), buf);
+					}
 				}
 			}
 			ImGui::End();

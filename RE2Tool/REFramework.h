@@ -18,7 +18,11 @@
 
 #define STATWND_KEY DIK_INSERT
 #define STATWND_DIST 10.0f
-#define MAX_ENTITY_COUNT 12
+#define MAX_ENTITY_COUNT 32
+#define GRAPH_REFRESH_INTERVAL 0.25
+#define START_MAX_FPS 100.0f
+#define MAX_FPS_COUNT 5
+#define UPDATE_DATA_DELAY 25
 
 //constexpr DWORD dwStatWndKey = DIK_INSERT;
 //constexpr float fOverlayDist = 10.0f;
@@ -28,6 +32,17 @@ struct SimpleVertex
 {
 	DirectX::XMFLOAT3 Pos;
 };
+
+typedef struct _RE_DATA
+{
+	BYTE bIsInControl;
+	INT iPlayerMaxHP;
+	INT iPlayerHP;
+	QWORD qwTime;
+	INT iEntityCount;
+	INT EntityMaxHPList[MAX_ENTITY_COUNT];
+	INT EntityHPList[MAX_ENTITY_COUNT];
+} RE_DATA, *PRE_DATA;
 
 class DInputHook;
 
@@ -60,13 +75,21 @@ private:
 	std::unique_ptr<WindowsMessageHook> mWindowsMessageHook;
 
 	// Virtual Data
-	VirtualData<BYTE> vdIsInControl;
-	VirtualData<QWORD> vdMSTime;
-	VirtualData<INT> vdPlayerMaxHP;
-	VirtualData<INT> vdPlayerHP;
-	VirtualData<INT> vdEntityMaxHP;
-	VirtualData<INT> vdEntityHP;
+	std::mutex mDataMutex;
+	RE_DATA mREData;
+	VirtualData<BYTE> mVDIsInControl;
+	VirtualData<QWORD> mVDMSTime;
+	VirtualData<INT> mVDPlayerMaxHP;
+	VirtualData<INT> mVDPlayerHP;
+	std::vector<VirtualData<INT>> mEntityMaxHPList;
+	std::vector<VirtualData<INT>> mEntityHPList;
+	
+	HANDLE mUpdateDataThreadHnd;
 
+	// Thread Starter
+	static DWORD WINAPI StartUpdateDataThread(LPVOID lpParam);
+	DWORD UpdateData();
+	
 	HRESULT CompileShaderFromFile(const WCHAR* szFileName, LPCSTR szEntryPoint, LPCSTR szShaderModel, ID3DBlob** ppBlobOut);
 	bool Init();
 	HRESULT InitShaders();
