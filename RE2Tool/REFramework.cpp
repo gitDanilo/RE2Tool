@@ -6,10 +6,12 @@ IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARA
 std::unique_ptr<REFramework> gREFramework {};
 
 REFramework::REFramework()
-	: mVDIsInControl(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x707A510, {0x408, 0xD8, 0x18, 0x20, 0x130}),
-	  mVDMSTime     (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACAE0, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x18}),
-	  mVDPlayerMaxHP(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACA88, {0x50, 0x20, 0x54}),
-	  mVDPlayerHP   (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACA88, {0x50, 0x20, 0x58})
+	: mVDIsInControl (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x707A510, {0x408, 0xD8, 0x18, 0x20, 0x130}),
+	  mVDActiveTime  (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACAE0, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x18}),
+	  mVDCutsceneTime(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACAE0, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x20}),
+	  mVDPausedTime  (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACAE0, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x30}),
+	  mVDPlayerMaxHP (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACA88, {0x50, 0x20, 0x54}),
+	  mVDPlayerHP    (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACA88, {0x50, 0x20, 0x58})
 {
 	mInit = false;
 	mStatWnd = false;
@@ -113,19 +115,21 @@ DWORD REFramework::UpdateData()
 		ZeroMemory(&TmpData, sizeof(RE_DATA));
 
 		mVDIsInControl.GetData(TmpData.bIsInControl);
+		mVDPlayerMaxHP.GetData(TmpData.iPlayerMaxHP);
 
-		if (TmpData.bIsInControl == 1)
+		if (TmpData.bIsInControl == 1 && TmpData.iPlayerMaxHP > 0)
 		{
-			mVDPlayerMaxHP.GetData(TmpData.iPlayerMaxHP);
 			mVDPlayerHP.GetData(TmpData.iPlayerHP);
-			mVDMSTime.GetData(TmpData.qwTime);
+			mVDActiveTime.GetData(TmpData.qwActiveTime);
+			mVDCutsceneTime.GetData(TmpData.qwCutsceneTime);
+			mVDPausedTime.GetData(TmpData.qwPausedTime);
 
 			for (i = 0; i < MAX_ENTITY_COUNT; ++i)
 			{
 				if (mEntityMaxHPList[i].GetData(TmpData.EntityMaxHPList[i]) == false)
 				{
 					mEntityMaxHPList[i].InvalidateDataAddr();
-					break;
+					continue;
 				}
 
 				bData = mEntityHPList[i].GetData(TmpData.EntityHPList[i]);
@@ -134,10 +138,17 @@ DWORD REFramework::UpdateData()
 				mEntityHPList[i].InvalidateDataAddr();
 
 				if (bData == false)
-					break;
+					continue;
 
 				++TmpData.iEntityCount;
 			}
+		}
+		else
+		{
+			mVDActiveTime.InvalidateDataAddr();
+			mVDCutsceneTime.InvalidateDataAddr();
+			mVDPausedTime.InvalidateDataAddr();
+			mVDPlayerHP.InvalidateDataAddr();
 		}
 
 		mDataMutex.lock();
@@ -145,8 +156,6 @@ DWORD REFramework::UpdateData()
 		mDataMutex.unlock();
 
 		mVDPlayerMaxHP.InvalidateDataAddr();
-		mVDPlayerHP.InvalidateDataAddr();
-		mVDMSTime.InvalidateDataAddr();
 		mVDIsInControl.InvalidateDataAddr();
 
 		Sleep(UPDATE_DATA_DELAY);
@@ -413,7 +422,7 @@ void REFramework::OnRender()
 		}
 	}
 
-	ID3D11DeviceContext* pContext = nullptr;
+	static ID3D11DeviceContext* pContext = nullptr;
 	mD3D11Hook->getDevice()->GetImmediateContext(&pContext);
 
 	//pContext->ClearRenderTargetView(g_mainRenderTargetView, DirectX::Colors::MidnightBlue);
@@ -484,7 +493,8 @@ void REFramework::DrawUI()
 
 		if (ImGui::Begin("RE2Tool", &mStatWnd, (mStatWndCorner != -1 ? ImGuiWindowFlags_NoMove : 0) | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav))
 		{
-			static char buf[32];
+			static RE_DATA TmpData;
+			static char buf[MAX_BUF_SIZE];
 
 			if (ImGui::CollapsingHeader("Game performance", ImGuiTreeNodeFlags_DefaultOpen))
 			{
@@ -529,20 +539,20 @@ void REFramework::DrawUI()
 				ImGui::PlotLines("", fps_list, IM_ARRAYSIZE(fps_list), list_index, buf, 0.0f, max_fps, ImVec2(198.0f, 60.0f), 4, true);
 			}
 
-			if (mREData.bIsInControl == 1)
+			mDataMutex.lock();
+			memcpy(&TmpData, &mREData, sizeof(RE_DATA));
+			mDataMutex.unlock();
+
+			if (TmpData.bIsInControl == 1 && TmpData.iPlayerMaxHP > 0)
 			{
 				static int i;
-				static RE_DATA TmpData;
 				static bool bHeaderOpen = false;
 				static float fProgress = 0.0f;
 
-				mDataMutex.lock();
-				memcpy(&TmpData, &mREData, sizeof(RE_DATA));
-				mDataMutex.unlock();
-
-				if (ImGui::CollapsingHeader("Player status", ImGuiTreeNodeFlags_DefaultOpen))
+				if (ImGui::CollapsingHeader("Player info", ImGuiTreeNodeFlags_DefaultOpen))
 				{
-					ImGui::Text("Time  : %i", TmpData.qwTime);
+					TmpData.GetFormatedTime(buf);
+					ImGui::Text("Time  : %s", buf);
 					ImGui::Text("Health:");
 					ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
 
@@ -551,14 +561,14 @@ void REFramework::DrawUI()
 					ImGui::ProgressBar(fProgress, ImVec2(-1.0f, 15.0f), buf);
 				}
 
-				for (i = 0; i < TmpData.iEntityCount; ++i)
+				if (TmpData.iEntityCount > 0)
 				{
-					if (i == 0)
-					{
-						bHeaderOpen = ImGui::CollapsingHeader("Entities health", ImGuiTreeNodeFlags_DefaultOpen);
-					}
-
-					if (bHeaderOpen)
+					sprintf_s(buf, "Entities health (%i)", TmpData.iEntityCount);
+					bHeaderOpen = ImGui::CollapsingHeader(buf, ImGuiTreeNodeFlags_DefaultOpen);
+				}
+				if (bHeaderOpen)
+				{
+					for (i = 0; i < TmpData.iEntityCount; ++i)
 					{
 						sprintf_s(buf, "%d/%d", TmpData.EntityHPList[i], TmpData.EntityMaxHPList[i]);
 						fProgress = static_cast<float>(TmpData.EntityHPList[i]) / static_cast<float>(TmpData.EntityMaxHPList[i]);
@@ -578,4 +588,24 @@ void REFramework::DrawUI()
 	{
 		mDInputHook->acknowledgeInput();
 	}
+}
+
+void _RE_DATA::GetFormatedTime(char* buf)
+{
+	QWORD qwTime = this->qwActiveTime - this->qwCutsceneTime - this->qwPausedTime;
+	QWORD qwH = 0, qwM = 0, qwS = 0;
+
+	qwH = qwTime / qwOneHourInMS;
+	if (qwTime % qwOneHourInMS)
+	{
+		qwTime -= qwH * qwOneHourInMS;
+		qwM = qwTime / qwOneMinInMS;
+		if (qwTime % qwOneMinInMS)
+		{
+			qwTime -= qwM * qwOneMinInMS;
+			qwS = qwTime / qwOneSecInMS;
+		}
+	}
+
+	sprintf_s(buf, MAX_BUF_SIZE, "%02llu:%02llu:%02llu", qwH, qwM, qwS);
 }

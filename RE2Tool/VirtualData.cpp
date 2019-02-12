@@ -48,7 +48,8 @@ bool VirtualData<T>::GetData(T &Data)
 		if (DataAddr == nullptr)
 			return false;
 	}
-	memcpy(&Data, DataAddr, sizeof(T));
+	Data = *reinterpret_cast<T*>(DataAddr);
+	//memcpy(&Data, DataAddr, sizeof(T));
 	return true;
 }
 

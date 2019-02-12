@@ -33,7 +33,8 @@ BYTE* memutil::ReadMultiLvlPtr(BYTE* BaseAddr, std::vector<DWORD> OffsetList)
 	BYTE* RetAddr = BaseAddr;
 	size_t i, j = OffsetList.size() - 1;
 
-	memcpy(&RetAddr, RetAddr, ptr_size);
+	RetAddr = reinterpret_cast<BYTE*>(*(reinterpret_cast<uintptr_t*>(RetAddr)));
+	//memcpy(&RetAddr, RetAddr, ptr_size);
 
 	for (i = 0; i < OffsetList.size(); ++i)
 	{
@@ -45,7 +46,7 @@ BYTE* memutil::ReadMultiLvlPtr(BYTE* BaseAddr, std::vector<DWORD> OffsetList)
 		if (IsBadReadPtr(RetAddr))
 			return nullptr;
 
-		memcpy(&RetAddr, RetAddr, ptr_size);
+		RetAddr = reinterpret_cast<BYTE*>(*(reinterpret_cast<uintptr_t*>(RetAddr)));
 	}
 
 	return (IsBadReadPtr(RetAddr) ? nullptr : RetAddr);

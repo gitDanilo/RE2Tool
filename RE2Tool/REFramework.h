@@ -23,7 +23,11 @@
 #define START_MAX_FPS 100.0f
 #define MAX_FPS_COUNT 5
 #define UPDATE_DATA_DELAY 25
+#define MAX_BUF_SIZE 32
 
+static constexpr QWORD qwOneHourInMS = 3600000000;
+static constexpr QWORD qwOneMinInMS  = 60000000;
+static constexpr QWORD qwOneSecInMS  = 1000000;
 //constexpr DWORD dwStatWndKey = DIK_INSERT;
 //constexpr float fOverlayDist = 10.0f;
 
@@ -38,10 +42,13 @@ typedef struct _RE_DATA
 	BYTE bIsInControl;
 	INT iPlayerMaxHP;
 	INT iPlayerHP;
-	QWORD qwTime;
+	QWORD qwActiveTime;
+	QWORD qwCutsceneTime;
+	QWORD qwPausedTime;
 	INT iEntityCount;
 	INT EntityMaxHPList[MAX_ENTITY_COUNT];
 	INT EntityHPList[MAX_ENTITY_COUNT];
+	void GetFormatedTime(char* buf);
 } RE_DATA, *PRE_DATA;
 
 class DInputHook;
@@ -78,7 +85,9 @@ private:
 	std::mutex mDataMutex;
 	RE_DATA mREData;
 	VirtualData<BYTE> mVDIsInControl;
-	VirtualData<QWORD> mVDMSTime;
+	VirtualData<QWORD> mVDActiveTime;
+	VirtualData<QWORD> mVDCutsceneTime;
+	VirtualData<QWORD> mVDPausedTime;
 	VirtualData<INT> mVDPlayerMaxHP;
 	VirtualData<INT> mVDPlayerHP;
 	std::vector<VirtualData<INT>> mEntityMaxHPList;

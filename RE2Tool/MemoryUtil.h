@@ -3,7 +3,7 @@
 #include <Windows.h>
 #include <vector>
 
-constexpr DWORD ptr_size = sizeof(BYTE*);
+//static constexpr DWORD ptr_size = sizeof(BYTE*);
 
 typedef unsigned long long QWORD;
 
