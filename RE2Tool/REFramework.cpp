@@ -6,12 +6,12 @@ IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARA
 std::unique_ptr<REFramework> gREFramework {};
 
 REFramework::REFramework()
-	: mVDIsInControl (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x707A510, {0x408, 0xD8, 0x18, 0x20, 0x130}),
-	  mVDActiveTime  (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACAE0, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x18}),
-	  mVDCutsceneTime(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACAE0, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x20}),
-	  mVDPausedTime  (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACAE0, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x30}),
-	  mVDPlayerMaxHP (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACA88, {0x50, 0x20, 0x54}),
-	  mVDPlayerHP    (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70ACA88, {0x50, 0x20, 0x58})
+	: mVDIsInControl (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70B0E90, {0x408, 0xD8, 0x18, 0x20, 0x130}),
+	  mVDActiveTime  (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70AFEE8, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x18}),
+	  mVDCutsceneTime(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70AFEE8, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x20}),
+	  mVDPausedTime  (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70AFEE8, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x30}),
+	  mVDPlayerMaxHP (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70AFE10, {0x50, 0x20, 0x54}),
+	  mVDPlayerHP    (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70AFE10, {0x50, 0x20, 0x58})
 {
 	mInit = false;
 	mStatWnd = false;
@@ -25,11 +25,35 @@ REFramework::REFramework()
 	mEntityHPList.reserve(MAX_ENTITY_COUNT);
 	for (DWORD i = 0; i < MAX_ENTITY_COUNT; ++i)
 	{
-		mEntityMaxHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x707B758, {0x80 + (i * 0x8), 0x88, 0x18, 0x1A0, 0x54}));
-		mEntityHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x707B758, {0x80 + (i * 0x8), 0x88, 0x18, 0x1A0, 0x58}));
+		mEntityMaxHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x7081E50, {0x178 + (i * 0x8), 0x18, 0xB8, 0x54}));
+		mEntityHPList.push_back   (VirtualData<INT>(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x7081E50, {0x178 + (i * 0x8), 0x18, 0xB8, 0x58}));
+		//mEntityMaxHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x7081EA8, {0x80 + (i * 0x8), 0x88, 0x18, 0x1A0, 0x54}));
+		//mEntityHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x7081EA8, {0x80 + (i * 0x8), 0x88, 0x18, 0x1A0, 0x58}));
 	}
 	
-	// hook
+	// hook dmg function
+	std::cout << "Hooking RE2 damage function..." << std::endl;
+
+	BYTE* ModuleBaseAddr = nullptr;
+	BYTE* DmgHandleAddr = nullptr;
+	DWORD dwModuleSize = 0;
+
+	if (memutil::GetModuleInfo(PROCESS_NAME, ModuleBaseAddr, dwModuleSize))
+	{
+		//DmgHandleAddr = memutil::AOBScan(ModuleBaseAddr, dwModuleSize, PatternList[SigID::dmg_handle].aobPattern, PatternList[SigID::dmg_handle].dwPatternSize);
+		DmgHandleAddr = reinterpret_cast<BYTE*>(0x14CA49A70);
+		if (DmgHandleAddr != nullptr)
+		{
+			//mRE2DmgHandle = std::make_unique<FunctionHook>(DmgHandleAddr, (uintptr_t)&REFramework::RE2DmgHandle);
+
+		}
+		else
+			std::cout << "AOBScan failed." << std::endl;
+	}
+	else
+		std::cout << "Failed to get module info." << std::endl;
+
+	// hook d3d11
 	std::cout << "Hooking D3D11..." << std::endl;
 
 	mD3D11Hook = std::make_unique<D3D11Hook>();
@@ -96,6 +120,17 @@ void REFramework::OnDirectInputKeys(const std::array<uint8_t, 256> &Keys)
 	}
 
 	mLastKeys = Keys;
+}
+
+void WINAPI REFramework::RE2DmgHandle(QWORD qwUnk1, QWORD qwUnk2)
+{
+	//void(__stdcall* DmgHandleFn)(void);
+	auto DmgHandleFn = gREFramework->mRE2DmgHandle->getOriginal<decltype(REFramework::RE2DmgHandle)>();
+	
+	std::cout << "RE2DmgHandle called." << std::endl;
+	//std::cout << "RE2DmgHandle called. (0x" << std::hex << std::uppercase << &DmgHandleFn << ')' << std::endl;
+
+	DmgHandleFn(qwUnk1, qwUnk2);
 }
 
 DWORD WINAPI REFramework::StartUpdateDataThread(LPVOID lpParam)
@@ -467,8 +502,6 @@ void REFramework::OnReset()
 	mInit = false;
 }
 
-typedef char* POINTER;
-
 void REFramework::DrawUI()
 {
 	std::lock_guard<std::mutex> guard(mInputMutex);
@@ -508,9 +541,6 @@ void REFramework::DrawUI()
 				static double time_diff = 0.0;
 
 				fps = io.Framerate;
-
-				//fps_list[list_index] = fps;
-				//list_index = (list_index + 1) % IM_ARRAYSIZE(fps_list);
 
 				if (time_start == 0.0)
 					time_start = ImGui::GetTime();
@@ -588,24 +618,4 @@ void REFramework::DrawUI()
 	{
 		mDInputHook->acknowledgeInput();
 	}
-}
-
-void _RE_DATA::GetFormatedTime(char* buf)
-{
-	QWORD qwTime = this->qwActiveTime - this->qwCutsceneTime - this->qwPausedTime;
-	QWORD qwH = 0, qwM = 0, qwS = 0;
-
-	qwH = qwTime / qwOneHourInMS;
-	if (qwTime % qwOneHourInMS)
-	{
-		qwTime -= qwH * qwOneHourInMS;
-		qwM = qwTime / qwOneMinInMS;
-		if (qwTime % qwOneMinInMS)
-		{
-			qwTime -= qwM * qwOneMinInMS;
-			qwS = qwTime / qwOneSecInMS;
-		}
-	}
-
-	sprintf_s(buf, MAX_BUF_SIZE, "%02llu:%02llu:%02llu", qwH, qwM, qwS);
 }

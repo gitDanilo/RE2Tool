@@ -18,18 +18,10 @@
 
 #define STATWND_KEY DIK_INSERT
 #define STATWND_DIST 10.0f
-#define MAX_ENTITY_COUNT 32
 #define GRAPH_REFRESH_INTERVAL 0.25
 #define START_MAX_FPS 100.0f
 #define MAX_FPS_COUNT 5
 #define UPDATE_DATA_DELAY 25
-#define MAX_BUF_SIZE 32
-
-static constexpr QWORD qwOneHourInMS = 3600000000;
-static constexpr QWORD qwOneMinInMS  = 60000000;
-static constexpr QWORD qwOneSecInMS  = 1000000;
-//constexpr DWORD dwStatWndKey = DIK_INSERT;
-//constexpr float fOverlayDist = 10.0f;
 
 // Structures
 struct SimpleVertex
@@ -37,19 +29,32 @@ struct SimpleVertex
 	DirectX::XMFLOAT3 Pos;
 };
 
-typedef struct _RE_DATA
+static const BYTE AOB_DMG_HANDLE[] =
 {
-	BYTE bIsInControl;
-	INT iPlayerMaxHP;
-	INT iPlayerHP;
-	QWORD qwActiveTime;
-	QWORD qwCutsceneTime;
-	QWORD qwPausedTime;
-	INT iEntityCount;
-	INT EntityMaxHPList[MAX_ENTITY_COUNT];
-	INT EntityHPList[MAX_ENTITY_COUNT];
-	void GetFormatedTime(char* buf);
-} RE_DATA, *PRE_DATA;
+	0x8B, 0x43, 0x7C, 0x89, 0x46, 0x7C, 0x48, 0x8B, 0x47, 0x50
+};
+
+namespace ModuleID
+{
+	enum ID: DWORD
+	{
+		base
+	};
+}
+
+#define PATTERNLIST_SIZE 4
+static AOB_PATTERN PatternList[PATTERNLIST_SIZE] =
+{
+	{ModuleID::base, 0, 0, const_cast<BYTE*>(AOB_DMG_HANDLE), sizeof(AOB_DMG_HANDLE), nullptr, 0}
+};
+
+namespace SigID
+{
+	enum ID: DWORD
+	{
+		dmg_handle
+	};
+}
 
 class DInputHook;
 
@@ -70,6 +75,8 @@ private:
 
 	//viewport
 	D3D11_VIEWPORT mViewport;
+
+	std::unique_ptr<FunctionHook> mRE2DmgHandle {};
 
 	// UI
 	bool mStatWnd;
@@ -94,6 +101,8 @@ private:
 	std::vector<VirtualData<INT>> mEntityHPList;
 	
 	HANDLE mUpdateDataThreadHnd;
+
+	static void WINAPI RE2DmgHandle(QWORD qwUnk1, QWORD qwUnk2);
 
 	// Thread Starter
 	static DWORD WINAPI StartUpdateDataThread(LPVOID lpParam);

@@ -26,7 +26,7 @@ DInputHook::DInputHook(HWND wnd)
 DInputHook::~DInputHook()
 {
 	// Explicitly unhook the methods we hooked so we can reset g_dinputHook.
-	m_getDeviceStateHook.reset();
+	m_GetDeviceStateHook.reset();
 
 	gDInputHook = nullptr;
 }
@@ -73,32 +73,30 @@ bool DInputHook::hook()
 
 	auto getDeviceState = (*(uintptr_t**)device)[9];
 
-	m_getDeviceStateHook = std::make_unique<FunctionHook>(getDeviceState, (uintptr_t)&DInputHook::getDeviceState);
+	m_GetDeviceStateHook = std::make_unique<FunctionHook>(getDeviceState, (uintptr_t)&DInputHook::GetDeviceState);
 
 	device->Release();
 	dinput->Release();
 
-	return m_getDeviceStateHook->isValid();
+	return m_GetDeviceStateHook->isValid();
 }
 
-HRESULT DInputHook::getDeviceState_Internal(IDirectInputDevice* device, DWORD size, LPVOID data)
+HRESULT DInputHook::GetDeviceState_Internal(IDirectInputDevice* device, DWORD size, LPVOID data)
 {
-	auto originalGetDeviceState = (decltype(DInputHook::getDeviceState)*)m_getDeviceStateHook->getOriginal();
-
-	//spdlog::debug("getDeviceState");
+	auto OriginalGetDeviceState = (decltype(DInputHook::GetDeviceState)*)m_GetDeviceStateHook->getOriginal();
 
 	// If we are ignoring input then we call the original to remove buffered    
 	// input events from the devices queue without modifying the out parameters.
-	if (m_isIgnoringInput || m_doOnce)
-	{
-		device->Unacquire();
-		device->SetCooperativeLevel(m_wnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
-		device->Acquire();
+	//if (m_isIgnoringInput || m_doOnce)
+	//{
+	//	device->Unacquire();
+	//	device->SetCooperativeLevel(m_wnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
+	//	device->Acquire();
 
-		m_doOnce = false;
-	}
+	//	m_doOnce = false;
+	//}
 
-	auto res = originalGetDeviceState(device, size, data);
+	auto res = OriginalGetDeviceState(device, size, data);
 
 	// Feed keys back to the framework
 	if (res == DI_OK && !m_isIgnoringInput && data != nullptr)
@@ -110,8 +108,8 @@ HRESULT DInputHook::getDeviceState_Internal(IDirectInputDevice* device, DWORD si
 	return res;
 }
 
-HRESULT WINAPI DInputHook::getDeviceState(IDirectInputDevice* device, DWORD size, LPVOID data)
+HRESULT WINAPI DInputHook::GetDeviceState(IDirectInputDevice* device, DWORD size, LPVOID data)
 {
-	return gDInputHook->getDeviceState_Internal(device, size, data);
+	return gDInputHook->GetDeviceState_Internal(device, size, data);
 }
 

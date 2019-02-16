@@ -33,7 +33,7 @@ public:
 
 	auto isValid() const
 	{
-		return m_getDeviceStateHook->isValid();
+		return m_GetDeviceStateHook->isValid();
 	}
 
 	void setWindow(HWND wnd)
@@ -47,13 +47,13 @@ public:
 private:
 	HWND m_wnd;
 
-	std::unique_ptr<FunctionHook> m_getDeviceStateHook;
+	std::unique_ptr<FunctionHook> m_GetDeviceStateHook;
 
 	bool m_isIgnoringInput;
 	bool m_doOnce;
 
 	bool hook();
 
-	HRESULT getDeviceState_Internal(IDirectInputDevice* device, DWORD size, LPVOID data);
-	static HRESULT WINAPI getDeviceState(IDirectInputDevice* device, DWORD size, LPVOID data);
+	HRESULT GetDeviceState_Internal(IDirectInputDevice* device, DWORD size, LPVOID data);
+	static HRESULT WINAPI GetDeviceState(IDirectInputDevice* device, DWORD size, LPVOID data);
 };
