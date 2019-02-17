@@ -8,7 +8,7 @@
 class WindowsMessageHook
 {
 public:
-	std::function<bool(HWND, UINT, WPARAM, LPARAM)> onMessage;
+	std::function<bool(HWND, UINT, WPARAM, LPARAM)> OnMessage;
 
 	WindowsMessageHook() = delete;
 	WindowsMessageHook(const WindowsMessageHook& other) = delete;
@@ -22,18 +22,18 @@ public:
 
 	auto isValid() const
 	{
-		return m_originalProc != nullptr;
+		return mOriginalProc != nullptr;
 	}
 
 	auto getOriginal() const
 	{
-		return m_originalProc;
+		return mOriginalProc;
 	}
 
 	WindowsMessageHook& operator=(const WindowsMessageHook& other) = delete;
 	WindowsMessageHook& operator=(const WindowsMessageHook&& other) = delete;
 
 private:
-	HWND m_wnd;
-	WNDPROC m_originalProc;
+	HWND mWnd;
+	WNDPROC mOriginalProc;
 };

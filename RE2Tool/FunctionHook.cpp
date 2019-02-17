@@ -19,11 +19,11 @@ FunctionHook::FunctionHook(Address target, Address destination) : mTarget {0}, m
 		mTarget = target;
 		mDestination = destination;
 		mOriginal = original;
-		std::cout << "Hooked: {0x" << std::hex << std::uppercase << static_cast<uintptr_t>(target) << "}->{0x" << std::hex << std::uppercase << static_cast<uintptr_t>(destination) << std::endl;
+		std::cout << "Hooked: {0x" << std::hex << std::uppercase << static_cast<uintptr_t>(target) << "}->{0x" << std::hex << std::uppercase << static_cast<uintptr_t>(destination) << '}' << std::endl;
 	}
 	else
 	{
-		std::cout << "Hooked failed: {0x" << std::hex << std::uppercase << static_cast<uintptr_t>(target) << "}->{0x" << std::hex << std::uppercase << static_cast<uintptr_t>(destination) << std::endl;
+		std::cout << "Hooked failed: {0x" << std::hex << std::uppercase << static_cast<uintptr_t>(target) << "}->{0x" << std::hex << std::uppercase << static_cast<uintptr_t>(destination) << '}' << std::endl;
 	}
 }
 

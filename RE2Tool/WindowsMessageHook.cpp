@@ -9,7 +9,7 @@ std::recursive_mutex gProcMutex {};
 
 LRESULT WINAPI WindowProc(HWND wnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	std::lock_guard<std::recursive_mutex> guard (gProcMutex);
+	std::lock_guard<std::recursive_mutex> guard(gProcMutex);
 
 	if (gWindowsMessageHook == nullptr)
 	{
@@ -17,12 +17,12 @@ LRESULT WINAPI WindowProc(HWND wnd, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 
 	// Call our onMessage callback.
-	auto& onMessage = gWindowsMessageHook->onMessage;
+	auto& _OnMessage = gWindowsMessageHook->OnMessage;
 
-	if (onMessage)
+	if (_OnMessage)
 	{
 		// If it returns false we don't call the original window procedure.
-		if (!onMessage(wnd, message, wParam, lParam))
+		if (!_OnMessage(wnd, message, wParam, lParam))
 		{
 			return DefWindowProc(wnd, message, wParam, lParam);
 		}
@@ -32,21 +32,19 @@ LRESULT WINAPI WindowProc(HWND wnd, UINT message, WPARAM wParam, LPARAM lParam)
 	return CallWindowProc(gWindowsMessageHook->getOriginal(), wnd, message, wParam, lParam);
 }
 
-WindowsMessageHook::WindowsMessageHook(HWND wnd)
-	: m_wnd {wnd},
-	m_originalProc {nullptr}
+WindowsMessageHook::WindowsMessageHook(HWND wnd) : mWnd {wnd}, mOriginalProc {nullptr}
 {
-	std::cout << "Initializing WindowsMessageHook" << std::endl;
+	std::cout << "Initializing WindowsMessageHook..." << std::endl;
 
 	gWindowsMessageHook = this;
 
 	// Save the original window procedure.
-	m_originalProc = (WNDPROC)GetWindowLongPtr(m_wnd, GWLP_WNDPROC);
+	mOriginalProc = (WNDPROC)GetWindowLongPtr(mWnd, GWLP_WNDPROC);
 
 	// Set it to our "hook" procedure.
-	SetWindowLongPtr(m_wnd, GWLP_WNDPROC, (LONG_PTR)&WindowProc);
+	SetWindowLongPtr(mWnd, GWLP_WNDPROC, (LONG_PTR)&WindowProc);
 
-	std::cout << "Hooked Windows message handler" << std::endl;
+	std::cout << "Hooked Windows message handler." << std::endl;
 }
 
 WindowsMessageHook::~WindowsMessageHook()
@@ -60,17 +58,17 @@ WindowsMessageHook::~WindowsMessageHook()
 bool WindowsMessageHook::remove()
 {
 	// Don't attempt to restore invalid original window procedures.
-	if (m_originalProc == nullptr || m_wnd == nullptr)
+	if (mOriginalProc == nullptr || mWnd == nullptr)
 	{
 		return true;
 	}
 
 	// Restore the original window procedure.
-	SetWindowLongPtr(m_wnd, GWLP_WNDPROC, (LONG_PTR)m_originalProc);
+	SetWindowLongPtr(mWnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(mOriginalProc));
 
 	// Invalidate this message hook.
-	m_wnd = nullptr;
-	m_originalProc = nullptr;
+	mWnd = nullptr;
+	mOriginalProc = nullptr;
 
 	return true;
 }

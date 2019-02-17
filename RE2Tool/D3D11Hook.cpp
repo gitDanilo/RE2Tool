@@ -42,8 +42,10 @@ bool D3D11Hook::hook()
 	auto presentFn = (*(uintptr_t**)swapChain)[8];
 	auto resizeBuffersFn = (*(uintptr_t**)swapChain)[13];
 
-	mPresentHook = std::make_unique<FunctionHook>(presentFn, (uintptr_t)&D3D11Hook::present);
-	mResizeBuffersHook = std::make_unique<FunctionHook>(resizeBuffersFn, (uintptr_t)&D3D11Hook::resizeBuffers);
+	std::cout << "Hooking D3D11 Present()..." << std::endl;
+	mPresentHook = std::make_unique<FunctionHook>(presentFn, (uintptr_t)&D3D11Hook::Present);
+	std::cout << "Hooking D3D11 ResizeBuffers()..." << std::endl;
+	mResizeBuffersHook = std::make_unique<FunctionHook>(resizeBuffersFn, (uintptr_t)&D3D11Hook::ResizeBuffers);
 
 	device->Release();
 	context->Release();
@@ -57,7 +59,7 @@ bool D3D11Hook::unhook()
 	return true;
 }
 
-HRESULT WINAPI D3D11Hook::present(IDXGISwapChain* swapChain, UINT syncInterval, UINT flags)
+HRESULT WINAPI D3D11Hook::Present(IDXGISwapChain* swapChain, UINT syncInterval, UINT flags)
 {
 	auto d3d11 = gD3D11Hook;
 
@@ -69,12 +71,12 @@ HRESULT WINAPI D3D11Hook::present(IDXGISwapChain* swapChain, UINT syncInterval, 
 		d3d11->mOnPresent(*d3d11);
 	}
 
-	auto presentFn = d3d11->mPresentHook->getOriginal<decltype(D3D11Hook::present)>();
+	auto presentFn = d3d11->mPresentHook->getOriginal<decltype(D3D11Hook::Present)>();
 
 	return presentFn(swapChain, syncInterval, flags);
 }
 
-HRESULT WINAPI D3D11Hook::resizeBuffers(IDXGISwapChain* swapChain, UINT BufferCount, UINT Width, UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags)
+HRESULT WINAPI D3D11Hook::ResizeBuffers(IDXGISwapChain* swapChain, UINT BufferCount, UINT Width, UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags)
 {
 	auto d3d11 = gD3D11Hook;
 
@@ -83,7 +85,7 @@ HRESULT WINAPI D3D11Hook::resizeBuffers(IDXGISwapChain* swapChain, UINT BufferCo
 		d3d11->mOnResizeBuffers(*d3d11);
 	}
 
-	auto resizeBuffersFn = d3d11->mResizeBuffersHook->getOriginal<decltype(D3D11Hook::resizeBuffers)>();
+	auto resizeBuffersFn = d3d11->mResizeBuffersHook->getOriginal<decltype(D3D11Hook::ResizeBuffers)>();
 
 	return resizeBuffersFn(swapChain, BufferCount, Width, Height, NewFormat, SwapChainFlags);
 }

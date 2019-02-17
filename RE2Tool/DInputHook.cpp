@@ -24,8 +24,6 @@ DInputHook::~DInputHook()
 
 bool DInputHook::hook()
 {
-	std::cout << "Hooking DInput8..." << std::endl;
-
 	// All we do here is create an IDirectInputDevice so that we can get the
 	// addresses of the methods we want to hook from its vtable.
 	using DirectInput8CreateFn = HRESULT(WINAPI*)(HINSTANCE, DWORD, REFIID, LPVOID*, LPUNKNOWN);
@@ -62,6 +60,7 @@ bool DInputHook::hook()
 
 	auto GetDeviceState = (*(uintptr_t**)device)[9];
 
+	std::cout << "Hooking DInput8 GetDeviceState()..." << std::endl;
 	mGetDeviceStateHook = std::make_unique<FunctionHook>(GetDeviceState, (uintptr_t)&DInputHook::GetDeviceState);
 
 	device->Release();

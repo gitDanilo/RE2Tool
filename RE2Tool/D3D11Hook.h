@@ -18,11 +18,11 @@ public:
 	bool hook();
 	bool unhook();
 
-	void onPresent(OnPresentFn fn)
+	void OnPresent(OnPresentFn fn)
 	{
 		mOnPresent = fn;
 	}
-	void onResizeBuffers(OnResizeBuffersFn fn)
+	void OnResizeBuffers(OnResizeBuffersFn fn)
 	{
 		mOnResizeBuffers = fn;
 	}
@@ -46,6 +46,6 @@ protected:
 	OnPresentFn mOnPresent {nullptr};
 	OnResizeBuffersFn mOnResizeBuffers {nullptr};
 
-	static HRESULT WINAPI present(IDXGISwapChain* swapChain, UINT syncInterval, UINT flags);
-	static HRESULT WINAPI resizeBuffers(IDXGISwapChain* swapChain, UINT BufferCount, UINT Width, UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags);
+	static HRESULT WINAPI Present(IDXGISwapChain* swapChain, UINT syncInterval, UINT flags);
+	static HRESULT WINAPI ResizeBuffers(IDXGISwapChain* swapChain, UINT BufferCount, UINT Width, UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags);
 };

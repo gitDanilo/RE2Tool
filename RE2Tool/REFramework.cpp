@@ -32,7 +32,7 @@ REFramework::REFramework()
 	}
 	
 	// hook dmg function
-	std::cout << "Hooking RE2 damage function..." << std::endl;
+	//std::cout << "Hooking RE2 damage function..." << std::endl;
 
 	BYTE* ModuleBaseAddr = nullptr;
 	BYTE* DmgHandleAddr = nullptr;
@@ -69,15 +69,12 @@ REFramework::REFramework()
 	//else
 	//	std::cout << "Failed to get module info." << std::endl;
 
-	// hook d3d11
-	std::cout << "Hooking D3D11..." << std::endl;
-
 	mD3D11Hook = std::make_unique<D3D11Hook>();
-	mD3D11Hook->onPresent([this](D3D11Hook& hook)
+	mD3D11Hook->OnPresent([this](D3D11Hook& hook)
 	{
 		OnRender();
 	});
-	mD3D11Hook->onResizeBuffers([this](D3D11Hook& hook)
+	mD3D11Hook->OnResizeBuffers([this](D3D11Hook& hook)
 	{
 		OnReset();
 	});
@@ -302,7 +299,7 @@ HRESULT REFramework::InitShaders()
 	pPSBlob->Release();
 	if (FAILED(hr))
 	{
-		std::cout << "Error on Release" << std::endl;
+		std::cout << "Error on Release." << std::endl;
 		return hr;
 	}
 
@@ -324,7 +321,7 @@ HRESULT REFramework::InitShaders()
 	hr = device->CreateBuffer(&bd, &InitData, &mPtrVertexBuffer);
 	if (FAILED(hr))
 	{
-		std::cout << "Error on CreateBuffer" << std::endl;
+		std::cout << "Error on CreateBuffer." << std::endl;
 		return hr;
 	}
 
@@ -345,9 +342,9 @@ bool REFramework::Init()
 	//}
 
 	auto device = mD3D11Hook->getDevice();
-	auto swapChain = mD3D11Hook->getSwapChain();
+	auto swapchain = mD3D11Hook->getSwapChain();
 
-	if (device == nullptr || swapChain == nullptr)
+	if (device == nullptr || swapchain == nullptr)
 	{
 		std::cout << "Device or SwapChain null. DirectX 12 may be in use." << std::endl;
 		return false;
@@ -357,7 +354,7 @@ bool REFramework::Init()
 	device->GetImmediateContext(&pContext);
 
 	DXGI_SWAP_CHAIN_DESC swapDesc {};
-	swapChain->GetDesc(&swapDesc);
+	swapchain->GetDesc(&swapDesc);
 
 	mWnd = swapDesc.OutputWindow;
 
@@ -377,7 +374,7 @@ bool REFramework::Init()
 
 	mWindowsMessageHook.reset();
 	mWindowsMessageHook = std::make_unique<WindowsMessageHook>(mWnd);
-	mWindowsMessageHook->onMessage = [this](auto wnd, auto msg, auto wParam, auto lParam)
+	mWindowsMessageHook->OnMessage = [this](auto wnd, auto msg, auto wParam, auto lParam)
 	{
 		return OnMessage(wnd, msg, wParam, lParam);
 	};
@@ -391,8 +388,6 @@ bool REFramework::Init()
 		mDInputHook->setWindow(mWnd);
 
 	// Create ImGui
-	std::cout << "Initializing ImGui..." << std::endl;
-
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 
@@ -492,6 +487,7 @@ void REFramework::OnRender()
 
 void REFramework::OnReset()
 {
+	std::cout << "Buffer resized." << std::endl;
 	if (mPtrRenderTargetView != nullptr)
 	{
 		mPtrRenderTargetView->Release();
