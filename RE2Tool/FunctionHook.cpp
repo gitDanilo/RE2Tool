@@ -1,18 +1,13 @@
-#include <MinHook.h>
 #include "FunctionHook.h"
 
-using namespace std;
+static bool gIsMinHookInitialized {false};
 
-bool g_isMinHookInitialized {false};
-
-FunctionHook::FunctionHook(Address target, Address destination) : m_target {0}, m_destination {0}, m_original {0}
+FunctionHook::FunctionHook(Address target, Address destination) : mTarget {0}, mDestination {0}, mOriginal {0}
 {
-	//spdlog::info("Attempting to hook {:p}->{:p}", target.ptr(), destination.ptr());
-
 	// Initialize MinHook if it hasn't been already.
-	if (!g_isMinHookInitialized && MH_Initialize() == MH_OK)
+	if (!gIsMinHookInitialized && MH_Initialize() == MH_OK)
 	{
-		g_isMinHookInitialized = true;
+		gIsMinHookInitialized = true;
 	}
 
 	// Create and enable the hook, only setting our member variables if it was
@@ -21,14 +16,14 @@ FunctionHook::FunctionHook(Address target, Address destination) : m_target {0}, 
 
 	if (MH_CreateHook(target.as<LPVOID>(), destination.as<LPVOID>(), (LPVOID*)&original) == MH_OK && MH_EnableHook(target.as<LPVOID>()) == MH_OK)
 	{
-		m_target = target;
-		m_destination = destination;
-		m_original = original;
-		//spdlog::info("Hooked {:p}->{:p}", target.ptr(), destination.ptr());
+		mTarget = target;
+		mDestination = destination;
+		mOriginal = original;
+		std::cout << "Hooked: {0x" << std::hex << std::uppercase << static_cast<uintptr_t>(target) << "}->{0x" << std::hex << std::uppercase << static_cast<uintptr_t>(destination) << std::endl;
 	}
 	else
 	{
-		//spdlog::error("Failed to hook {:p}", target.ptr());
+		std::cout << "Hooked failed: {0x" << std::hex << std::uppercase << static_cast<uintptr_t>(target) << "}->{0x" << std::hex << std::uppercase << static_cast<uintptr_t>(destination) << std::endl;
 	}
 }
 
@@ -40,21 +35,21 @@ FunctionHook::~FunctionHook()
 bool FunctionHook::remove()
 {
 	// Don't try to remove invalid hooks.
-	if (m_original == 0)
+	if (mOriginal == 0)
 	{
 		return true;
 	}
 
 	// Disable then remove the hook.
-	if (MH_DisableHook((LPVOID)m_target) != MH_OK || MH_RemoveHook((LPVOID)m_target) != MH_OK)
+	if (MH_DisableHook(reinterpret_cast<LPVOID>(mTarget)) != MH_OK || MH_RemoveHook(reinterpret_cast<LPVOID>(mTarget)) != MH_OK)
 	{
 		return false;
 	}
 
 	// Invalidate the members.
-	m_target = 0;
-	m_destination = 0;
-	m_original = 0;
+	mTarget = 0;
+	mDestination = 0;
+	mOriginal = 0;
 
 	return true;
 }

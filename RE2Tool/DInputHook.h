@@ -18,39 +18,39 @@ public:
 
 	void ignoreInput()
 	{
-		m_isIgnoringInput = true;
+		mIsIgnoringInput = true;
 	}
 
 	void acknowledgeInput()
 	{
-		m_isIgnoringInput = false;
+		mIsIgnoringInput = false;
 	}
 
 	auto isIgnoringInput() const
 	{
-		return m_isIgnoringInput;
+		return mIsIgnoringInput;
 	}
 
 	auto isValid() const
 	{
-		return m_GetDeviceStateHook->isValid();
+		return mGetDeviceStateHook->isValid();
 	}
 
 	void setWindow(HWND wnd)
 	{
-		m_wnd = wnd;
+		mWnd = wnd;
 	}
 
 	DInputHook& operator=(const DInputHook& other) = delete;
 	DInputHook& operator=(DInputHook&& other) = delete;
 
 private:
-	HWND m_wnd;
+	HWND mWnd;
 
-	std::unique_ptr<FunctionHook> m_GetDeviceStateHook;
+	std::unique_ptr<FunctionHook> mGetDeviceStateHook;
 
-	bool m_isIgnoringInput;
-	bool m_doOnce;
+	bool mIsIgnoringInput;
+	bool mDoOnce;
 
 	bool hook();
 

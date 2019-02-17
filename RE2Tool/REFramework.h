@@ -23,6 +23,8 @@
 #define MAX_FPS_COUNT 5
 #define UPDATE_DATA_DELAY 25
 
+//typedef int (WINAPI MESSAGEBOXA)(HWND, LPCSTR, LPCSTR, UINT);
+
 // Structures
 struct SimpleVertex
 {
@@ -56,6 +58,9 @@ namespace SigID
 	};
 }
 
+// Commented out in original ImGui code
+IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
 class DInputHook;
 
 class REFramework
@@ -76,7 +81,7 @@ private:
 	//viewport
 	D3D11_VIEWPORT mViewport;
 
-	std::unique_ptr<FunctionHook> mRE2DmgHandle {};
+	//std::unique_ptr<FunctionHook> mRE2DmgHandle {};
 
 	// UI
 	bool mStatWnd;
@@ -101,8 +106,6 @@ private:
 	std::vector<VirtualData<INT>> mEntityHPList;
 	
 	HANDLE mUpdateDataThreadHnd;
-
-	static void WINAPI RE2DmgHandle(QWORD qwUnk1, QWORD qwUnk2);
 
 	// Thread Starter
 	static DWORD WINAPI StartUpdateDataThread(LPVOID lpParam);

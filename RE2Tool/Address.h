@@ -8,63 +8,62 @@ class Address
 {
 public:
 	Address();
-	Address(void* ptr);
+	Address(void* addr);
 	Address(uintptr_t addr);
 
 	void set(void* ptr)
 	{
-		m_ptr = ptr;
+		mPtr = ptr;
 	}
 
 	template <typename T>
 	Address get(T offset) const
 	{
-		return Address((uintptr_t)m_ptr + offset);
+		return Address(reinterpret_cast<uintptr_t>(mPtr + offset));
 	}
 
 	template <typename T>
 	Address add(T offset) const
 	{
-		return Address((uintptr_t)m_ptr + offset);
+		return Address(reinterpret_cast<uintptr_t>(mPtr + offset));
 	}
 
 	template <typename T>
 	Address sub(T offset) const
 	{
-		return Address((uintptr_t)m_ptr - offset);
+		return Address(static_cast<uintptr_t>(mPtr - offset));
 	}
 
 	template <typename T>
 	T as() const
 	{
-		return (T)m_ptr;
+		return static_cast<T>(mPtr);
 	}
 
-	// to is like as but dereferences that shit.
 	template <typename T>
 	T to() const
 	{
-		return *(T*)m_ptr;
+		return *static_cast<T*>(mPtr);
 	}
 
 	void* ptr() const
 	{
-		return m_ptr;
+		return mPtr;
 	}
 
 	operator uintptr_t() const
 	{
-		return (uintptr_t)m_ptr;
+		return reinterpret_cast<uintptr_t>(mPtr);
 	}
 
 	operator void*() const
 	{
-		return m_ptr;
+		return mPtr;
 	}
 
 	bool operator ==(bool val)
 	{
-		return ((m_ptr && val) || (!m_ptr && !val));
+		return ((mPtr && val) || (!mPtr && !val));
 	}
 
 	bool operator !=(bool val)
@@ -74,7 +73,7 @@ public:
 
 	bool operator ==(uintptr_t val)
 	{
-		return ((uintptr_t)m_ptr == val);
+		return (reinterpret_cast<uintptr_t>(mPtr) == val);
 	}
 
 	bool operator !=(uintptr_t val)
@@ -84,7 +83,7 @@ public:
 
 	bool operator ==(void* val)
 	{
-		return (m_ptr == val);
+		return (mPtr == val);
 	}
 
 	bool operator !=(void* val)
@@ -93,7 +92,7 @@ public:
 	}
 
 private:
-	void* m_ptr;
+	void* mPtr;
 };
 
 typedef Address Offset;

@@ -5,7 +5,7 @@
 #include "REFramework.h"
 
 // Global variables
-HMODULE g_dinput = 0;
+static HMODULE gDinput = 0;
 
 // Method declaration
 DWORD WINAPI startupThread();
@@ -16,7 +16,7 @@ extern "C"
 	__declspec(dllexport) HRESULT WINAPI DirectInput8Create_(HINSTANCE hinst, DWORD dwVersion, const IID& riidltf, LPVOID* ppvOut, LPUNKNOWN punkOuter)
 	{
 	#pragma comment(linker, "/EXPORT:DirectInput8Create=DirectInput8Create_")
-		return ((decltype(DirectInput8Create)*)GetProcAddress(g_dinput, "DirectInput8Create"))(hinst, dwVersion, riidltf, ppvOut, punkOuter);
+		return ((decltype(DirectInput8Create)*)GetProcAddress(gDinput, "DirectInput8Create"))(hinst, dwVersion, riidltf, ppvOut, punkOuter);
 	}
 }
 
@@ -33,8 +33,8 @@ DWORD WINAPI startupThread()
 	if (GetSystemDirectoryW(buffer, MAX_PATH) == 0)
 		failedMsg();
 
-	g_dinput = LoadLibraryW((std::wstring {buffer} + L"\\dinput8.dll").c_str());
-	if (g_dinput == NULL)
+	gDinput = LoadLibraryW((std::wstring {buffer} + L"\\dinput8.dll").c_str());
+	if (gDinput == NULL)
 		failedMsg();
 
 	AllocConsole();

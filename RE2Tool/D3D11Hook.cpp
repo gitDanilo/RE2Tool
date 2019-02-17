@@ -3,7 +3,7 @@
 
 using namespace std;
 
-static D3D11Hook* g_d3d11Hook = nullptr;
+static D3D11Hook* gD3D11Hook = nullptr;
 
 D3D11Hook::~D3D11Hook()
 {
@@ -12,7 +12,7 @@ D3D11Hook::~D3D11Hook()
 
 bool D3D11Hook::hook()
 {	
-	g_d3d11Hook = this;
+	gD3D11Hook = this;
 
 	HWND hWnd = GetDesktopWindow();
 	IDXGISwapChain* swapChain = nullptr;
@@ -42,14 +42,14 @@ bool D3D11Hook::hook()
 	auto presentFn = (*(uintptr_t**)swapChain)[8];
 	auto resizeBuffersFn = (*(uintptr_t**)swapChain)[13];
 
-	m_presentHook = std::make_unique<FunctionHook>(presentFn, (uintptr_t)&D3D11Hook::present);
-	m_resizeBuffersHook = std::make_unique<FunctionHook>(resizeBuffersFn, (uintptr_t)&D3D11Hook::resizeBuffers);
+	mPresentHook = std::make_unique<FunctionHook>(presentFn, (uintptr_t)&D3D11Hook::present);
+	mResizeBuffersHook = std::make_unique<FunctionHook>(resizeBuffersFn, (uintptr_t)&D3D11Hook::resizeBuffers);
 
 	device->Release();
 	context->Release();
 	swapChain->Release();
 
-	return m_hooked = true;
+	return mHooked = true;
 }
 
 bool D3D11Hook::unhook()
@@ -59,31 +59,31 @@ bool D3D11Hook::unhook()
 
 HRESULT WINAPI D3D11Hook::present(IDXGISwapChain* swapChain, UINT syncInterval, UINT flags)
 {
-	auto d3d11 = g_d3d11Hook;
+	auto d3d11 = gD3D11Hook;
 
-	d3d11->m_swapChain = swapChain;
-	swapChain->GetDevice(__uuidof(d3d11->m_device), (void**)&d3d11->m_device);
+	d3d11->mSwapChain = swapChain;
+	swapChain->GetDevice(__uuidof(d3d11->mDevice), (void**)&d3d11->mDevice);
 
-	if (d3d11->m_onPresent)
+	if (d3d11->mOnPresent)
 	{
-		d3d11->m_onPresent(*d3d11);
+		d3d11->mOnPresent(*d3d11);
 	}
 
-	auto presentFn = d3d11->m_presentHook->getOriginal<decltype(D3D11Hook::present)>();
+	auto presentFn = d3d11->mPresentHook->getOriginal<decltype(D3D11Hook::present)>();
 
 	return presentFn(swapChain, syncInterval, flags);
 }
 
 HRESULT WINAPI D3D11Hook::resizeBuffers(IDXGISwapChain* swapChain, UINT BufferCount, UINT Width, UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags)
 {
-	auto d3d11 = g_d3d11Hook;
+	auto d3d11 = gD3D11Hook;
 
-	if (d3d11->m_onResizeBuffers)
+	if (d3d11->mOnResizeBuffers)
 	{
-		d3d11->m_onResizeBuffers(*d3d11);
+		d3d11->mOnResizeBuffers(*d3d11);
 	}
 
-	auto resizeBuffersFn = d3d11->m_resizeBuffersHook->getOriginal<decltype(D3D11Hook::resizeBuffers)>();
+	auto resizeBuffersFn = d3d11->mResizeBuffersHook->getOriginal<decltype(D3D11Hook::resizeBuffers)>();
 
 	return resizeBuffersFn(swapChain, BufferCount, Width, Height, NewFormat, SwapChainFlags);
 }

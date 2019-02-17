@@ -3,18 +3,17 @@
 
 using namespace std;
 
-Address::Address()
-	: m_ptr(nullptr)
+Address::Address() : mPtr(nullptr)
 {
 
 }
 
-Address::Address(void* ptr) : m_ptr(ptr)
+Address::Address(void* addr) : mPtr(addr)
 {
 
 }
 
-Address::Address(uintptr_t addr) : m_ptr((void*)addr)
+Address::Address(uintptr_t addr) : mPtr(reinterpret_cast<void*>(addr))
 {
 
 }

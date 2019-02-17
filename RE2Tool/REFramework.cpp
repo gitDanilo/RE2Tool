@@ -1,17 +1,8 @@
 #include "REFramework.h"
 
-// Commented out in original ImGui code
-IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
-
 std::unique_ptr<REFramework> gREFramework {};
 
 REFramework::REFramework()
-	: mVDIsInControl (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70B0E90, {0x408, 0xD8, 0x18, 0x20, 0x130}),
-	  mVDActiveTime  (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70AFEE8, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x18}),
-	  mVDCutsceneTime(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70AFEE8, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x20}),
-	  mVDPausedTime  (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70AFEE8, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x30}),
-	  mVDPlayerMaxHP (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70AFE10, {0x50, 0x20, 0x54}),
-	  mVDPlayerHP    (reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x70AFE10, {0x50, 0x20, 0x58})
 {
 	mInit = false;
 	mStatWnd = false;
@@ -21,14 +12,23 @@ REFramework::REFramework()
 
 	ZeroMemory(&mREData, sizeof(RE_DATA));
 
+	// Initialize virtual memory pointers
+	HMODULE BaseModuleAddr = GetModuleHandle(0);
+	mVDIsInControl.SetDataPtr(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70B0E90, {0x408, 0xD8, 0x18, 0x20, 0x130});
+	mVDActiveTime.SetDataPtr(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70AFEE8, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x18});
+	mVDCutsceneTime.SetDataPtr(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70AFEE8, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x20});
+	mVDPausedTime.SetDataPtr(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70AFEE8, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x30});
+	mVDPlayerMaxHP.SetDataPtr(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70AFE10, {0x50, 0x20, 0x54});
+	mVDPlayerHP.SetDataPtr(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70AFE10, {0x50, 0x20, 0x58});
+
 	mEntityMaxHPList.reserve(MAX_ENTITY_COUNT);
 	mEntityHPList.reserve(MAX_ENTITY_COUNT);
 	for (DWORD i = 0; i < MAX_ENTITY_COUNT; ++i)
 	{
-		mEntityMaxHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x7081E50, {0x178 + (i * 0x8), 0x18, 0xB8, 0x54}));
-		mEntityHPList.push_back   (VirtualData<INT>(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x7081E50, {0x178 + (i * 0x8), 0x18, 0xB8, 0x58}));
-		//mEntityMaxHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x7081EA8, {0x80 + (i * 0x8), 0x88, 0x18, 0x1A0, 0x54}));
-		//mEntityHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(GetModuleHandle(0)) + 0x7081EA8, {0x80 + (i * 0x8), 0x88, 0x18, 0x1A0, 0x58}));
+		mEntityMaxHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x7081E50, {0x178 + (i * 0x8), 0x18, 0xB8, 0x54}));
+		mEntityHPList.push_back   (VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x7081E50, {0x178 + (i * 0x8), 0x18, 0xB8, 0x58}));
+		//mEntityMaxHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x7081EA8, {0x80 + (i * 0x8), 0x88, 0x18, 0x1A0, 0x54}));
+		//mEntityHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x7081EA8, {0x80 + (i * 0x8), 0x88, 0x18, 0x1A0, 0x58}));
 	}
 	
 	// hook dmg function
@@ -38,20 +38,36 @@ REFramework::REFramework()
 	BYTE* DmgHandleAddr = nullptr;
 	DWORD dwModuleSize = 0;
 
-	if (memutil::GetModuleInfo(PROCESS_NAME, ModuleBaseAddr, dwModuleSize))
-	{
-		//DmgHandleAddr = memutil::AOBScan(ModuleBaseAddr, dwModuleSize, PatternList[SigID::dmg_handle].aobPattern, PatternList[SigID::dmg_handle].dwPatternSize);
-		DmgHandleAddr = reinterpret_cast<BYTE*>(0x14CA49A70);
-		if (DmgHandleAddr != nullptr)
-		{
-			//mRE2DmgHandle = std::make_unique<FunctionHook>(DmgHandleAddr, (uintptr_t)&REFramework::RE2DmgHandle);
+	//if (MH_Initialize() != MH_OK)
+	//{
+	//	std::cout << "MH_Initialize failed." << std::endl;
+	//}
+	//// Create a hook for MessageBoxW, in disabled state.
+	//if (MH_CreateHook(&MessageBoxA, &DetourFunction, reinterpret_cast<LPVOID*>(&ptrMessageBoxA)) != MH_OK)
+	//{
+	//	std::cout << "MH_CreateHook failed." << std::endl;
+	//}
+	//// Enable the hook for MessageBoxW.
+	//if (MH_EnableHook(&MessageBoxA) != MH_OK)
+	//{
+	//	std::cout << "MH_EnableHook failed." << std::endl;
+	//}
 
-		}
-		else
-			std::cout << "AOBScan failed." << std::endl;
-	}
-	else
-		std::cout << "Failed to get module info." << std::endl;
+	//if (memutil::GetModuleInfo(PROCESS_NAME, ModuleBaseAddr, dwModuleSize))
+	//{
+	//	//DmgHandleAddr = memutil::AOBScan(ModuleBaseAddr, dwModuleSize, PatternList[SigID::dmg_handle].aobPattern, PatternList[SigID::dmg_handle].dwPatternSize);
+	//	//DmgHandleAddr = reinterpret_cast<BYTE*>(0x14CA49A70);
+	//	DmgHandleAddr = reinterpret_cast<BYTE*>(&MessageBoxA);
+	//	if (DmgHandleAddr != nullptr)
+	//	{
+	//		mRE2DmgHandle = std::make_unique<FunctionHook>(&MessageBoxA, &DetourFunction);
+	//		ptrMessageBoxA = mRE2DmgHandle->getOriginal<MESSAGEBOXA>();
+	//	}
+	//	else
+	//		std::cout << "AOBScan failed." << std::endl;
+	//}
+	//else
+	//	std::cout << "Failed to get module info." << std::endl;
 
 	// hook d3d11
 	std::cout << "Hooking D3D11..." << std::endl;
@@ -66,14 +82,7 @@ REFramework::REFramework()
 		OnReset();
 	});
 
-	if (mD3D11Hook->hook())
-	{
-		std::cout << "Hook completed!" << std::endl;
-	}
-	else
-	{
-		std::cout << "Hook failed." << std::endl;
-	}
+	mD3D11Hook->hook();
 }
 
 REFramework::~REFramework()
@@ -120,17 +129,6 @@ void REFramework::OnDirectInputKeys(const std::array<uint8_t, 256> &Keys)
 	}
 
 	mLastKeys = Keys;
-}
-
-void WINAPI REFramework::RE2DmgHandle(QWORD qwUnk1, QWORD qwUnk2)
-{
-	//void(__stdcall* DmgHandleFn)(void);
-	auto DmgHandleFn = gREFramework->mRE2DmgHandle->getOriginal<decltype(REFramework::RE2DmgHandle)>();
-	
-	std::cout << "RE2DmgHandle called." << std::endl;
-	//std::cout << "RE2DmgHandle called. (0x" << std::hex << std::uppercase << &DmgHandleFn << ')' << std::endl;
-
-	DmgHandleFn(qwUnk1, qwUnk2);
 }
 
 DWORD WINAPI REFramework::StartUpdateDataThread(LPVOID lpParam)
