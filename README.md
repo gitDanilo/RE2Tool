@@ -11,7 +11,7 @@ Resident Evil 2 Remake HUD tool. Display enemies health on a directx11 overlay.
 
 ## Installing
 
-Copy RE2Tool/x64/Release/RE2Tool.dll to game the game folder as dinput8.dll.
+Copy RE2Tool/x64/Release/RE2Tool.dll to the game folder as dinput8.dll.
 
 ## How to use
 
