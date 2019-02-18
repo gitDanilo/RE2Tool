@@ -48,7 +48,7 @@ DWORD WINAPI startupThread()
 
 	std::cout << "RE2Tool DLL Injected." << std::endl;
 
-	MessageBox(0, "Press OK to continue.", "RE2Tool", 0);
+	//MessageBox(0, "Press OK to continue.", "RE2Tool", 0);
 
 	gREFramework = std::make_unique<REFramework>();
 

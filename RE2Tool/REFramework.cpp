@@ -9,6 +9,24 @@ REFramework::REFramework()
 	mWnd = 0;
 	mInputHooked = false;
 	mStatWndCorner = 0;
+	mPtrFW1Factory = nullptr;
+	pExecMem = nullptr;
+
+	ZeroMemory(&mFontParams, sizeof(FW1_FONTWRAPPERCREATEPARAMS));
+	mFontParams.GlyphSheetWidth = 512;
+	mFontParams.GlyphSheetHeight = 512;
+	mFontParams.MaxGlyphCountPerSheet = 2048;
+	mFontParams.SheetMipLevels = 1;
+	mFontParams.AnisotropicFiltering = FALSE;
+	mFontParams.MaxGlyphWidth = 384;
+	mFontParams.MaxGlyphHeight = 384;
+	mFontParams.DisableGeometryShader = FALSE;
+	mFontParams.VertexBufferSize = 0;
+	mFontParams.DefaultFontParams.pszFontFamily = L"Consolas";
+	mFontParams.DefaultFontParams.FontWeight = DWRITE_FONT_WEIGHT_BOLD;
+	mFontParams.DefaultFontParams.FontStyle = DWRITE_FONT_STYLE_NORMAL;
+	mFontParams.DefaultFontParams.FontStretch = DWRITE_FONT_STRETCH_NORMAL;
+	mFontParams.DefaultFontParams.pszLocale = L"";
 
 	ZeroMemory(&mREData, sizeof(RE_DATA));
 
@@ -33,10 +51,24 @@ REFramework::REFramework()
 	
 	// hook dmg function
 	//std::cout << "Hooking RE2 damage function..." << std::endl;
+	
+	//BYTE* ModuleBaseAddr = nullptr;
+	//BYTE* AOBAddr = nullptr;
+	//DWORD dwModuleSize = 0;
 
-	BYTE* ModuleBaseAddr = nullptr;
-	BYTE* DmgHandleAddr = nullptr;
-	DWORD dwModuleSize = 0;
+	//OnDamageReceived(33);
+
+	//if (memutil::GetModuleInfo(PROCESS_NAME, ModuleBaseAddr, dwModuleSize))
+	//{
+	//	AOBAddr = memutil::AOBScan(ModuleBaseAddr, dwModuleSize, PatternList[SigID::dmg_handle].aobPattern, PatternList[SigID::dmg_handle].dwPatternSize);
+	//	pExecMem = memutil::AllocExecMem(AOB_DETOUR, sizeof(AOB_DETOUR));
+
+	//	intptr_t iJumpParam = reinterpret_cast<intptr_t>(pExecMem);
+	//	memcpy(AOB_JUMP + 2, &iJumpParam, sizeof(intptr_t));
+	//	memutil::PatchExecMemory(AOBAddr, AOB_JUMP, sizeof(AOB_JUMP));
+	//}
+
+	//VirtualFree(pExecMem, 0, MEM_RELEASE);
 
 	//if (MH_Initialize() != MH_OK)
 	//{
@@ -361,16 +393,23 @@ bool REFramework::Init()
 	CreateRenderTarget();
 
 	// Setup the viewport
-	mViewport.Width = 1920.0f;
-	mViewport.Height = 1080.0f;
+	RECT rect = {};
+	if (GetWindowRect(mWnd, &rect))
+	{
+		mViewport.Width = static_cast<float>(rect.right - rect.left);
+		mViewport.Height = static_cast<float>(rect.bottom - rect.top);
+	}
 	mViewport.MinDepth = 0.0f;
 	mViewport.MaxDepth = 1.0f;
 	mViewport.TopLeftX = 0.0f;
 	mViewport.TopLeftY = 0.0f;
 
-	FW1CreateFactory(FW1_VERSION, &mPtrFW1Factory);
-	mPtrFW1Factory->CreateFontWrapper(mD3D11Hook->getDevice(), L"Consolas", &mPtrFontWrapper);
-	mPtrFW1Factory->Release();
+	if (mPtrFW1Factory == nullptr)
+	{
+		FW1CreateFactory(FW1_VERSION, &mPtrFW1Factory);
+		mPtrFW1Factory->CreateFontWrapper(mD3D11Hook->getDevice(), nullptr, &mFontParams, &mPtrFontWrapper);
+		mPtrFW1Factory->Release();
+	}
 
 	mWindowsMessageHook.reset();
 	mWindowsMessageHook = std::make_unique<WindowsMessageHook>(mWnd);
@@ -457,7 +496,8 @@ void REFramework::OnRender()
 
 	pContext->OMSetRenderTargets(1, &mPtrRenderTargetView, NULL);
 
-	pContext->RSSetViewports(1, &mViewport);
+	//pContext->RSSetViewports(1, &mViewport);
+	//DrawHitmark(pContext);
 
 	// Draw triangle
 	//context->IASetInputLayout(g_pVertexLayout);
@@ -468,9 +508,6 @@ void REFramework::OnRender()
 	//context->VSSetShader(g_pVertexShader, nullptr, 0);
 	//context->PSSetShader(mPtrPixelShader, nullptr, 0);
 	//context->Draw(3, 0);
-
-	// Color = ABGR
-	//mPtrFontWrapper->DrawString(pContext, L"Press <INSERT> to open debug window", 16.0f, 0.0f, 0.0f, 0xFF1EFB52, FW1_RESTORESTATE);
 
 	// Draw ImGui
 	ImGui_ImplDX11_NewFrame();
@@ -573,10 +610,11 @@ void REFramework::DrawUI()
 				static bool bHeaderOpen = false;
 				static float fProgress = 0.0f;
 
-				if (ImGui::CollapsingHeader("Player info", ImGuiTreeNodeFlags_DefaultOpen))
+				if (ImGui::CollapsingHeader("General info", ImGuiTreeNodeFlags_DefaultOpen))
 				{
 					TmpData.GetFormatedTime(buf);
 					ImGui::Text("Time  : %s", buf);
+					ImGui::Text("Damage: %i", TmpData.iLastDmg);
 					ImGui::Text("Health:");
 					ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
 
@@ -612,4 +650,15 @@ void REFramework::DrawUI()
 	{
 		mDInputHook->acknowledgeInput();
 	}
+}
+
+void REFramework::DrawHitmark(ID3D11DeviceContext* &pContext)
+{
+	// Color = ABGR
+	mPtrFontWrapper->DrawString(pContext, L"200", 20.0f, ((mViewport.Width / 2.0f) - 0), ((mViewport.Height / 2.0f) - 50.0f), 0xFF1EFB52, FW1_RESTORESTATE);
+}
+
+void WINAPI OnDamageReceived(int iDamage)
+{
+	std::cout << "Damage received: " << iDamage << std::endl;
 }

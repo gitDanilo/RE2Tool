@@ -126,3 +126,44 @@ bool memutil::GetModuleInfo(const char* sModuleName, BYTE* &ModuleBaseAddr, DWOR
 	CloseHandle(hModuleSnap);
 	return (ModuleBaseAddr != 0);
 }
+
+bool memutil::PatchExecMemory(BYTE* MemAddr, const BYTE* aobPatch, DWORD dwPatchSize)
+{
+	DWORD dwOldProtect;
+
+	if (MemAddr == nullptr || aobPatch == nullptr || dwPatchSize == 0)
+		return false;
+
+	if (VirtualProtect(MemAddr, dwPatchSize, PAGE_READWRITE, &dwOldProtect) == FALSE)
+		return false;
+
+	CopyMemory(MemAddr, aobPatch, dwPatchSize);
+
+	if (VirtualProtect(MemAddr, dwPatchSize, dwOldProtect, nullptr) == FALSE)
+		return false;
+
+	return true;
+}
+
+LPVOID memutil::AllocExecMem(const BYTE* aobFunction, DWORD dwFunctionSize)
+{
+	SYSTEM_INFO SysInfo = {};
+	LPVOID pNewMem = nullptr;
+	DWORD dwOldProtect;
+
+	if (aobFunction == nullptr || dwFunctionSize == 0)
+		return nullptr;
+
+	GetSystemInfo(&SysInfo);
+	pNewMem = VirtualAlloc(nullptr, SysInfo.dwPageSize, MEM_COMMIT, PAGE_READWRITE);
+
+	if (pNewMem == nullptr)
+		return nullptr;
+
+	memcpy(pNewMem, aobFunction, dwFunctionSize);
+
+	if (VirtualProtect(pNewMem, dwFunctionSize, PAGE_EXECUTE_READ, &dwOldProtect) == FALSE)
+		return nullptr;
+
+	return pNewMem;
+}

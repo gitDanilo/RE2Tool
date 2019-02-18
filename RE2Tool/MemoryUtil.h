@@ -33,6 +33,7 @@ typedef struct _RE_DATA
 	QWORD qwActiveTime;
 	QWORD qwCutsceneTime;
 	QWORD qwPausedTime;
+	INT iLastDmg;
 	INT iEntityCount;
 	INT EntityMaxHPList[MAX_ENTITY_COUNT];
 	INT EntityHPList[MAX_ENTITY_COUNT];
@@ -47,4 +48,6 @@ namespace memutil
 	bool CompareByteArray(const BYTE* ByteArray1, const BYTE* ByteArray2, DWORD dwLength);
 	BYTE* AOBScan(const BYTE* AOB, DWORD dwImageSize, const BYTE* TargetAOB, DWORD dwLength);
 	bool GetModuleInfo(const char* sModuleName, BYTE* &ModuleBaseAddr, DWORD &dwModuleSize);
+	bool PatchExecMemory(BYTE* MemAddr, const BYTE* aobPatch, DWORD dwPatchSize);
+	LPVOID AllocExecMem(const BYTE* aobFunction, DWORD dwFunctionSize);
 }

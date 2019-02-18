@@ -31,6 +31,24 @@ struct SimpleVertex
 	DirectX::XMFLOAT3 Pos;
 };
 
+static BYTE AOB_JUMP[] =
+{
+	// mov rax, x64_addr
+	0x48, 0xB8, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
+	// jmp rax
+	0xFF, 0xE0
+};
+
+static const BYTE AOB_ORIGINAL[] =
+{
+	0x8B, 0x43, 0x7C, 0x89, 0x46, 0x7C, 0x48, 0x8B, 0x47, 0x50
+};
+
+static const BYTE AOB_DETOUR[] =
+{
+	0x8B, 0x43, 0x7C, 0x89, 0x46, 0x7C, 0x48, 0x8B, 0x47, 0x50
+};
+
 static const BYTE AOB_DMG_HANDLE[] =
 {
 	0x8B, 0x43, 0x7C, 0x89, 0x46, 0x7C, 0x48, 0x8B, 0x47, 0x50
@@ -61,6 +79,8 @@ namespace SigID
 // Commented out in original ImGui code
 IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
+void WINAPI OnDamageReceived(int iDamage);
+
 class DInputHook;
 
 class REFramework
@@ -80,6 +100,8 @@ private:
 
 	//viewport
 	D3D11_VIEWPORT mViewport;
+
+	FW1_FONTWRAPPERCREATEPARAMS mFontParams;
 
 	//std::unique_ptr<FunctionHook> mRE2DmgHandle {};
 
@@ -105,6 +127,8 @@ private:
 	std::vector<VirtualData<INT>> mEntityMaxHPList;
 	std::vector<VirtualData<INT>> mEntityHPList;
 	
+	LPVOID pExecMem;
+
 	HANDLE mUpdateDataThreadHnd;
 
 	// Thread Starter
@@ -119,6 +143,7 @@ private:
 	void OnRender();
 	void OnReset();
 	void DrawUI();
+	void DrawHitmark(ID3D11DeviceContext* &pContext);
 public:
 	REFramework();
 	virtual ~REFramework();
