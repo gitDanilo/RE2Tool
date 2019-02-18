@@ -614,7 +614,7 @@ void REFramework::DrawUI()
 				{
 					TmpData.GetFormatedTime(buf);
 					ImGui::Text("Time  : %s", buf);
-					ImGui::Text("Damage: %i", TmpData.iLastDmg);
+					//ImGui::Text("Damage: %i", TmpData.iLastDmg);
 					ImGui::Text("Health:");
 					ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
 
