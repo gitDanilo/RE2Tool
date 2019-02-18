@@ -2,7 +2,7 @@
 
 Resident Evil 2 Remake HUD tool. Display enemies health on a directx11 overlay.
 
-![alt text](https://steamcommunity.com/id/redheron/screenshots)
+![alt text](https://imgur.com/XVDisXY)
 
 ## Prerequisites
 
