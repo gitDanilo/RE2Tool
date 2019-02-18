@@ -16,3 +16,7 @@ Copy RE2Tool/x64/Release/RE2Tool.dll to the game folder as dinput8.dll.
 ## How to use
 
 Just start the game and press "INSERT" if you want to change overlay position or hide it.
+
+## Thanks
+
+[praydog](https://github.com/praydog) for the [RE2-Mod-Framework](https://github.com/praydog/RE2-Mod-Framework)
