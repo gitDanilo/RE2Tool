@@ -32,19 +32,22 @@ REFramework::REFramework()
 
 	// Initialize virtual memory pointers
 	HMODULE BaseModuleAddr = GetModuleHandle(0);
-	mVDIsInControl.SetDataPtr(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70B0E90, {0x408, 0xD8, 0x18, 0x20, 0x130});
-	mVDActiveTime.SetDataPtr(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70AFEE8, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x18});
-	mVDCutsceneTime.SetDataPtr(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70AFEE8, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x20});
-	mVDPausedTime.SetDataPtr(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70AFEE8, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x30});
-	mVDPlayerMaxHP.SetDataPtr(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70AFE10, {0x50, 0x20, 0x54});
-	mVDPlayerHP.SetDataPtr(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70AFE10, {0x50, 0x20, 0x58});
+	//mVDIsInControl.SetDataPtr(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70B0E90, {0x408, 0xD8, 0x18, 0x20, 0x130});
+	mVDIsInControl.SetDataPtr (reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x707C0C0, {0x140, 0xF8, 0x10, 0x28, 0x130});
+	mVDActiveTime.SetDataPtr  (reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70B0910, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x18});
+	mVDCutsceneTime.SetDataPtr(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70B0910, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x20});
+	mVDPausedTime.SetDataPtr  (reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70B0910, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x30});
+	mVDPlayerMaxHP.SetDataPtr (reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70B0840, {0x50, 0x20, 0x54});
+	mVDPlayerHP.SetDataPtr    (reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70B0840, {0x50, 0x20, 0x58});
 
 	mEntityMaxHPList.reserve(MAX_ENTITY_COUNT);
 	mEntityHPList.reserve(MAX_ENTITY_COUNT);
 	for (DWORD i = 0; i < MAX_ENTITY_COUNT; ++i)
 	{
-		mEntityMaxHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x7081E50, {0x178 + (i * 0x8), 0x18, 0xB8, 0x54}));
-		mEntityHPList.push_back   (VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x7081E50, {0x178 + (i * 0x8), 0x18, 0xB8, 0x58}));
+		mEntityMaxHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x707C528, {0x260 + (i * 0x8), 0x70, 0x18, 0x288, 0x54}));
+		mEntityHPList.push_back   (VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x707C528, {0x260 + (i * 0x8), 0x70, 0x18, 0x288, 0x58}));
+		//mEntityMaxHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x7081E50, {0x178 + (i * 0x8), 0x18, 0xB8, 0x54}));
+		//mEntityHPList.push_back   (VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x7081E50, {0x178 + (i * 0x8), 0x18, 0xB8, 0x58}));
 		//mEntityMaxHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x7081EA8, {0x80 + (i * 0x8), 0x88, 0x18, 0x1A0, 0x54}));
 		//mEntityHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x7081EA8, {0x80 + (i * 0x8), 0x88, 0x18, 0x1A0, 0x58}));
 	}
