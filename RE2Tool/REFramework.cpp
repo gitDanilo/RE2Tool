@@ -32,6 +32,16 @@ REFramework::REFramework()
 
 	ZeroMemory(&mREData, sizeof(RE_DATA));
 
+	if (!InitializeCriticalSectionAndSpinCount(&mCSInput, DEFAULT_SPINCOUNT))
+	{
+		std::cout << "Failed to initialize critical section." << std::endl;
+	}
+
+	if (!InitializeCriticalSectionAndSpinCount(&mCSData, DEFAULT_SPINCOUNT))
+	{
+		std::cout << "Failed to initialize critical section." << std::endl;
+	}
+
 	// Initialize virtual memory pointers
 	HMODULE BaseModuleAddr = GetModuleHandle(0);
 	//mVDIsInControl.SetDataPtr(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70B0E90, {0x408, 0xD8, 0x18, 0x20, 0x130});
@@ -122,6 +132,9 @@ REFramework::~REFramework()
 {
 	if (this->mUpdateDataThreadHnd)
 		TerminateThread(this->mUpdateDataThreadHnd, 0);
+
+	DeleteCriticalSection(&mCSInput);
+	DeleteCriticalSection(&mCSData);
 }
 
 bool REFramework::OnMessage(HWND wnd, UINT message, WPARAM wParam, LPARAM lParam)
@@ -149,7 +162,7 @@ void REFramework::OnDirectInputKeys(const std::array<uint8_t, 256> &Keys)
 {
 	if (Keys[STATWND_KEY] && mLastKeys[STATWND_KEY] == 0)
 	{
-		std::lock_guard<std::mutex> guard(mInputMutex);
+		EnterCriticalSection(&mCSInput);
 
 		++mStatWndCorner;
 		if (mStatWndCorner > 3)
@@ -159,6 +172,8 @@ void REFramework::OnDirectInputKeys(const std::array<uint8_t, 256> &Keys)
 		}
 		else
 			mStatWnd = true;
+
+		LeaveCriticalSection(&mCSInput);
 	}
 
 	mLastKeys = Keys;
@@ -211,15 +226,16 @@ DWORD REFramework::UpdateData()
 		}
 		else
 		{
+			mLastDmg = 0;
 			mVDActiveTime.InvalidateDataAddr();
 			mVDCutsceneTime.InvalidateDataAddr();
 			mVDPausedTime.InvalidateDataAddr();
 			mVDPlayerHP.InvalidateDataAddr();
 		}
 
-		mDataMutex.lock();
+		EnterCriticalSection(&mCSData);
 		memcpy(&mREData, &TmpData, sizeof(RE_DATA));
-		mDataMutex.unlock();
+		LeaveCriticalSection(&mCSData);
 
 		mVDPlayerMaxHP.InvalidateDataAddr();
 		mVDIsInControl.InvalidateDataAddr();
@@ -451,6 +467,15 @@ bool REFramework::Init()
 	mInit = true;
 	mStatWnd = true;
 
+	auto& io = ImGui::GetIO();
+
+	io.WantCaptureKeyboard = false;
+	io.WantCaptureMouse = false;
+	io.MouseDrawCursor = false;
+	io.ConfigFlags = ImGuiConfigFlags_NoMouse;
+
+	mDInputHook->acknowledgeInput();
+
 	if (this->mUpdateDataThreadHnd == nullptr)
 		this->mUpdateDataThreadHnd = CreateThread(nullptr, 0, this->StartUpdateDataThread, this, 0, nullptr);
 
@@ -464,7 +489,6 @@ void REFramework::CleanupRenderTarget()
 		mPtrRenderTargetView->Release();
 		mPtrRenderTargetView = nullptr;
 	}
-
 }
 
 void REFramework::CreateRenderTarget()
@@ -518,7 +542,9 @@ void REFramework::OnRender()
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 
+	EnterCriticalSection(&mCSInput);
 	DrawUI();
+	LeaveCriticalSection(&mCSInput);
 
 	ImGui::EndFrame();
 	ImGui::Render();
@@ -539,15 +565,8 @@ void REFramework::OnReset()
 
 void REFramework::DrawUI()
 {
-	std::lock_guard<std::mutex> guard(mInputMutex);
-
 	auto& io = ImGui::GetIO();
 	auto& style = ImGui::GetStyle();
-
-	io.WantCaptureKeyboard = false;
-	io.WantCaptureMouse = false;
-	io.MouseDrawCursor = false;
-	io.ConfigFlags = ImGuiConfigFlags_NoMouse;
 
 	if (mStatWnd && mStatWndCorner != -1)
 	{
@@ -604,9 +623,9 @@ void REFramework::DrawUI()
 				ImGui::PlotLines("", fps_list, IM_ARRAYSIZE(fps_list), list_index, buf, 0.0f, max_fps, ImVec2(198.0f, 60.0f), 4, true);
 			}
 
-			mDataMutex.lock();
+			EnterCriticalSection(&mCSData);
 			memcpy(&TmpData, &mREData, sizeof(RE_DATA));
-			mDataMutex.unlock();
+			LeaveCriticalSection(&mCSData);
 
 			if (TmpData.bIsInControl == 1 && TmpData.iPlayerMaxHP > 0)
 			{
@@ -645,15 +664,6 @@ void REFramework::DrawUI()
 			ImGui::End();
 		}
 	}
-
-	if (io.WantCaptureKeyboard)
-	{
-		mDInputHook->ignoreInput();
-	}
-	else
-	{
-		mDInputHook->acknowledgeInput();
-	}
 }
 
 void REFramework::DrawHitmark(ID3D11DeviceContext* &pContext)
@@ -670,7 +680,7 @@ void WINAPI REFramework::OnDamageReceived(QWORD qwP1, QWORD qwP2, QWORD qwP3)
 	if (iDamage > 1 || iDamage < 0)
 	{
 		gREFramework->mLastDmg = iDamage;
-		std::cout << "Damage dealt: " << std::dec << iDamage << std::endl;
+		std::cout << "Last damage: " << std::dec << iDamage << std::endl;
 	}
 
 	gREFramework->mPtrDamageFunction(qwP1, qwP2, qwP3);

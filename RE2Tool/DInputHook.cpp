@@ -75,14 +75,14 @@ HRESULT DInputHook::GetDeviceState_Internal(IDirectInputDevice* device, DWORD si
 
 	// If we are ignoring input then we call the original to remove buffered    
 	// input events from the devices queue without modifying the out parameters.
-	//if (m_isIgnoringInput || m_doOnce)
-	//{
-	//	device->Unacquire();
-	//	device->SetCooperativeLevel(m_wnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
-	//	device->Acquire();
+	if (mIsIgnoringInput || mDoOnce)
+	{
+		device->Unacquire();
+		device->SetCooperativeLevel(mWnd, DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
+		device->Acquire();
 
-	//	m_doOnce = false;
-	//}
+		mDoOnce = false;
+	}
 
 	auto res = OriginalGetDeviceState(device, size, data);
 

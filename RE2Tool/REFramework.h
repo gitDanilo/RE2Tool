@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <array>
+#include <queue>
 #include <mutex>
 #include <d3d11_1.h>
 #include <d3dcompiler.h>
@@ -21,7 +22,8 @@
 #define GRAPH_REFRESH_INTERVAL 0.25
 #define START_MAX_FPS 100.0f
 #define MAX_FPS_COUNT 5
-#define UPDATE_DATA_DELAY 30
+#define UPDATE_DATA_DELAY 50
+#define DEFAULT_SPINCOUNT 0x000032
 
 //typedef int (WINAPI MESSAGEBOXA)(HWND, LPCSTR, LPCSTR, UINT);
 typedef void (WINAPI *ONDMGFUNCTION)(QWORD, QWORD, QWORD);
@@ -107,17 +109,17 @@ private:
 	//std::unique_ptr<FunctionHook> mRE2DmgHandle {};
 
 	// UI
+	CRITICAL_SECTION mCSInput;
+	HWND mWnd;
 	bool mStatWnd;
 	int mStatWndCorner;
-	HWND mWnd;
 	bool mInputHooked;
-	std::mutex mInputMutex;
-	std::array<uint8_t, 256> mLastKeys {0};
+	std::array<uint8_t, 256> mLastKeys;
 	std::unique_ptr<DInputHook> mDInputHook;
 	std::unique_ptr<WindowsMessageHook> mWindowsMessageHook;
 
 	// Virtual Data
-	std::mutex mDataMutex;
+	CRITICAL_SECTION mCSData;
 	RE_DATA mREData;
 	VirtualData<BYTE> mVDIsInControl;
 	VirtualData<QWORD> mVDActiveTime;
@@ -132,6 +134,7 @@ private:
 
 	HANDLE mUpdateDataThreadHnd;
 	ONDMGFUNCTION mPtrDamageFunction;
+	std::queue<INT> mDmgQueue;
 	INT mLastDmg;
 
 	static void WINAPI OnDamageReceived(QWORD qwP1, QWORD qwP2, QWORD qwP3);
