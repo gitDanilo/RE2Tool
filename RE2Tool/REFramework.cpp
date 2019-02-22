@@ -11,6 +11,8 @@ REFramework::REFramework()
 	mStatWndCorner = 0;
 	mPtrFW1Factory = nullptr;
 	pExecMem = nullptr;
+	mLastDmg = 0;
+	mPtrDamageFunction = nullptr;
 
 	ZeroMemory(&mFontParams, sizeof(FW1_FONTWRAPPERCREATEPARAMS));
 	mFontParams.GlyphSheetWidth = 512;
@@ -53,11 +55,12 @@ REFramework::REFramework()
 	}
 	
 	// hook dmg function
-	//std::cout << "Hooking RE2 damage function..." << std::endl;
+	std::cout << "Hooking RE2 damage function..." << std::endl;
 	
-	//BYTE* ModuleBaseAddr = nullptr;
-	//BYTE* AOBAddr = nullptr;
-	//DWORD dwModuleSize = 0;
+	BYTE* ModuleBaseAddr = nullptr;
+	//BYTE* AOBAddr = reinterpret_cast<BYTE*>(0x149FF1CE0);
+	BYTE* AOBAddr = reinterpret_cast<BYTE*>(0x14ACD6FF0);
+	DWORD dwModuleSize = 0;
 
 	//OnDamageReceived(33);
 
@@ -73,20 +76,18 @@ REFramework::REFramework()
 
 	//VirtualFree(pExecMem, 0, MEM_RELEASE);
 
-	//if (MH_Initialize() != MH_OK)
-	//{
-	//	std::cout << "MH_Initialize failed." << std::endl;
-	//}
-	//// Create a hook for MessageBoxW, in disabled state.
-	//if (MH_CreateHook(&MessageBoxA, &DetourFunction, reinterpret_cast<LPVOID*>(&ptrMessageBoxA)) != MH_OK)
-	//{
-	//	std::cout << "MH_CreateHook failed." << std::endl;
-	//}
-	//// Enable the hook for MessageBoxW.
-	//if (MH_EnableHook(&MessageBoxA) != MH_OK)
-	//{
-	//	std::cout << "MH_EnableHook failed." << std::endl;
-	//}
+	if (MH_Initialize() != MH_OK)
+	{
+		std::cout << "MH_Initialize failed." << std::endl;
+	}
+	if (MH_CreateHook(AOBAddr, &REFramework::OnDamageReceived, reinterpret_cast<LPVOID*>(&mPtrDamageFunction)) != MH_OK)
+	{
+		std::cout << "MH_CreateHook failed." << std::endl;
+	}
+	if (MH_EnableHook(AOBAddr) != MH_OK)
+	{
+		std::cout << "MH_EnableHook failed." << std::endl;
+	}
 
 	//if (memutil::GetModuleInfo(PROCESS_NAME, ModuleBaseAddr, dwModuleSize))
 	//{
@@ -617,7 +618,7 @@ void REFramework::DrawUI()
 				{
 					TmpData.GetFormatedTime(buf);
 					ImGui::Text("Time  : %s", buf);
-					//ImGui::Text("Damage: %i", TmpData.iLastDmg);
+					ImGui::Text("Damage: %i", mLastDmg);
 					ImGui::Text("Health:");
 					ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
 
@@ -661,7 +662,16 @@ void REFramework::DrawHitmark(ID3D11DeviceContext* &pContext)
 	mPtrFontWrapper->DrawString(pContext, L"200", 20.0f, ((mViewport.Width / 2.0f) - 0), ((mViewport.Height / 2.0f) - 50.0f), 0xFF1EFB52, FW1_RESTORESTATE);
 }
 
-void WINAPI OnDamageReceived(int iDamage)
+void WINAPI REFramework::OnDamageReceived(QWORD qwP1, QWORD qwP2, QWORD qwP3)
 {
-	std::cout << "Damage received: " << iDamage << std::endl;
+	//INT iDamage = *(reinterpret_cast<INT*>(qwP3 + 0x7C));
+	INT iDamage = static_cast<INT>(qwP3);
+
+	if (iDamage > 1 || iDamage < 0)
+	{
+		gREFramework->mLastDmg = iDamage;
+		std::cout << "Damage dealt: " << std::dec << iDamage << std::endl;
+	}
+
+	gREFramework->mPtrDamageFunction(qwP1, qwP2, qwP3);
 }

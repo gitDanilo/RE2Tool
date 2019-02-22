@@ -24,6 +24,7 @@
 #define UPDATE_DATA_DELAY 30
 
 //typedef int (WINAPI MESSAGEBOXA)(HWND, LPCSTR, LPCSTR, UINT);
+typedef void (WINAPI *ONDMGFUNCTION)(QWORD, QWORD, QWORD);
 
 // Structures
 struct SimpleVertex
@@ -79,7 +80,7 @@ namespace SigID
 // Commented out in original ImGui code
 IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-void WINAPI OnDamageReceived(int iDamage);
+//void WINAPI OnDamageReceived(int iDamage);
 
 class DInputHook;
 
@@ -130,6 +131,10 @@ private:
 	LPVOID pExecMem;
 
 	HANDLE mUpdateDataThreadHnd;
+	ONDMGFUNCTION mPtrDamageFunction;
+	INT mLastDmg;
+
+	static void WINAPI OnDamageReceived(QWORD qwP1, QWORD qwP2, QWORD qwP3);
 
 	// Thread Starter
 	static DWORD WINAPI StartUpdateDataThread(LPVOID lpParam);
