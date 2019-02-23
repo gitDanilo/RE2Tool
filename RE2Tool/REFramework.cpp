@@ -677,7 +677,7 @@ void REFramework::DrawUI()
 
 					ImGui::Text("Damage :");
 					ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-					if (mLastDmg > 0)
+					if (mLastDmg >= 0)
 						ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%i", mLastDmg);
 					else
 						ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%i", mLastDmg);
@@ -748,10 +748,9 @@ void WINAPI REFramework::OnDamageReceived(QWORD qwP1, QWORD qwP2, QWORD qwP3)
 
 	if (iDamage > 1 || iDamage < 0)
 	{
-		gREFramework->mLastDmg = iDamage;
-
 		EnterCriticalSection(&gREFramework->mCSInput);
-
+		
+		gREFramework->mLastDmg = iDamage;
 		if (gREFramework->mHitmark)
 		{
 			if (gREFramework->mDmgList.size() == DMG_LIST_CAPACITY)
