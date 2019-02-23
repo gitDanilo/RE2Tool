@@ -15,7 +15,7 @@ Copy RE2Tool/x64/Release/RE2Tool.dll to the game folder as dinput8.dll.
 
 ## How to use
 
-Just start the game and press "INSERT" if you want to change overlay position or hide it.
+Just start the game and press "INSERT" if you want to change overlay position or hide it. If you want to disable the hitmark press "DELETE".
 
 ## Thanks
 

@@ -8,7 +8,7 @@
 static HMODULE gDinput = 0;
 
 // Method declaration
-DWORD WINAPI startupThread();
+DWORD WINAPI StartupThread();
 void failedMsg();
 
 extern "C"
@@ -26,7 +26,7 @@ void failedMsg()
 	ExitProcess(0);
 }
 
-DWORD WINAPI startupThread()
+DWORD WINAPI StartupThread()
 {
 	// init
 	wchar_t buffer[MAX_PATH] {0};
@@ -59,7 +59,7 @@ BOOL APIENTRY DllMain(HANDLE handle, DWORD reason, LPVOID reserved)
 {
 	if (reason == DLL_PROCESS_ATTACH)
 	{
-		CreateThread(nullptr, 0, reinterpret_cast<LPTHREAD_START_ROUTINE>(startupThread), nullptr, 0, nullptr);
+		CreateThread(nullptr, 0, reinterpret_cast<LPTHREAD_START_ROUTINE>(StartupThread), nullptr, 0, nullptr);
 	}
 
 	return TRUE;

@@ -131,6 +131,7 @@ private:
 	HITM_INFO mHitmInf;
 	//ONDMGFUNCTION mPtrDamageFunction;
 	std::unique_ptr<FunctionHook> mOnDmgRecvHook;
+	size_t mLastSize;
 	std::vector<INT> mDmgList;
 	HANDLE mUpdateDataThreadHnd;
 

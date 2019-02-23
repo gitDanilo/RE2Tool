@@ -13,6 +13,7 @@ REFramework::REFramework()
 	mPtrFW1Factory = nullptr;
 	//mExecMem = nullptr;
 	mLastDmg = 0;
+	mLastSize = 0;
 	//mPtrDamageFunction = nullptr;
 
 	ZeroMemory(&mFontParams, sizeof(FW1_FONTWRAPPERCREATEPARAMS));
@@ -173,6 +174,7 @@ void REFramework::OnDirectInputKeys(const std::array<uint8_t, 256> &Keys)
 		if (mHitmark)
 			mResetTimer = true;
 		mDmgList.clear();
+		mLastSize = 0;
 
 		LeaveCriticalSection(&mCSInput);
 	}
@@ -711,6 +713,9 @@ void REFramework::DrawHitmark(ID3D11DeviceContext* &pContext)
 	}
 	else
 	{
+		if (mLastSize < mDmgList.size())
+			time_start = ImGui::GetTime();
+
 		time_now = ImGui::GetTime();
 		time_diff = time_now - time_start;
 		if (time_diff >= HITMARK_DISPLAY_INTERVAL)
@@ -727,6 +732,8 @@ void REFramework::DrawHitmark(ID3D11DeviceContext* &pContext)
 		swprintf_s(buf, L"%i", mDmgList[i]);
 		mPtrFontWrapper->DrawString(pContext, buf, mHitmInf.fFontSize, mHitmInf.X, mHitmInf.Y - (mHitmInf.fFontSize * i), mHitmInf.dwColor, FW1_RESTORESTATE);
 	}
+
+	mLastSize = mDmgList.size();
 }
 
 void WINAPI REFramework::OnDamageReceived(QWORD qwP1, QWORD qwP2, QWORD qwP3)
