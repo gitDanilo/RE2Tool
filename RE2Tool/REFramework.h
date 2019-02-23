@@ -2,8 +2,6 @@
 
 #include <iostream>
 #include <array>
-//#include <queue>
-#include <mutex>
 #include <d3d11_1.h>
 #include <d3dcompiler.h>
 #include <directxmath.h>
@@ -51,27 +49,9 @@ typedef struct _HITM_INFO
 	DWORD dwColor;
 } HITM_INFO, *PHITM_INFO;
 
-static BYTE AOB_JUMP[] =
-{
-	// mov rax, x64_addr
-	0x48, 0xB8, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC, 0xCC,
-	// jmp rax
-	0xFF, 0xE0
-};
-
-static const BYTE AOB_ORIGINAL[] =
-{
-	0x8B, 0x43, 0x7C, 0x89, 0x46, 0x7C, 0x48, 0x8B, 0x47, 0x50
-};
-
-static const BYTE AOB_DETOUR[] =
-{
-	0x8B, 0x43, 0x7C, 0x89, 0x46, 0x7C, 0x48, 0x8B, 0x47, 0x50
-};
-
 static const BYTE AOB_DMG_HANDLE[] =
 {
-	0x8B, 0x43, 0x7C, 0x89, 0x46, 0x7C, 0x48, 0x8B, 0x47, 0x50
+	0x45, 0x31, 0xC0, 0x41, 0x8D, 0x50, 0x38, 0xE8, 0xCC, 0xCC, 0xCC, 0xCC, 0xE9, 0xCC, 0xCC, 0xCC, 0xCC, 0x44, 0x8B, 0x45, 0x7C, 0xE8
 };
 
 namespace ModuleID
@@ -85,7 +65,7 @@ namespace ModuleID
 #define PATTERNLIST_SIZE 4
 static AOB_PATTERN PatternList[PATTERNLIST_SIZE] =
 {
-	{ModuleID::base, 0, 0, const_cast<BYTE*>(AOB_DMG_HANDLE), sizeof(AOB_DMG_HANDLE), nullptr, 0}
+	{ModuleID::base, 21, 0, const_cast<BYTE*>(AOB_DMG_HANDLE), sizeof(AOB_DMG_HANDLE), nullptr, 0}
 };
 
 namespace SigID
@@ -105,6 +85,7 @@ class REFramework
 {
 private:
 	bool mInit;
+	bool mSetup;
 	std::unique_ptr<D3D11Hook> mD3D11Hook;
 	ID3D11RenderTargetView* mPtrRenderTargetView;
 	ID3D11VertexShader* mPtrVertexShader;
@@ -146,12 +127,12 @@ private:
 
 	// Hitmark
 	//LPVOID mExecMem;
-	HITM_INFO mHitmInf;
-	HANDLE mUpdateDataThreadHnd;
-	ONDMGFUNCTION mPtrDamageFunction;
-	//std::unique_ptr<FunctionHook> mRE2DmgHandle {};
-	std::vector<INT> mDmgList;
 	INT mLastDmg;
+	HITM_INFO mHitmInf;
+	//ONDMGFUNCTION mPtrDamageFunction;
+	std::unique_ptr<FunctionHook> mOnDmgRecvHook;
+	std::vector<INT> mDmgList;
+	HANDLE mUpdateDataThreadHnd;
 
 	static void WINAPI OnDamageReceived(QWORD qwP1, QWORD qwP2, QWORD qwP3);
 
@@ -160,7 +141,7 @@ private:
 	DWORD UpdateData();
 	
 	HRESULT CompileShaderFromFile(const WCHAR* szFileName, LPCSTR szEntryPoint, LPCSTR szShaderModel, ID3DBlob** ppBlobOut);
-	bool Init();
+	bool Setup();
 	HRESULT InitShaders();
 	void CreateRenderTarget();
 	void CleanupRenderTarget();
@@ -174,6 +155,7 @@ public:
 
 	bool OnMessage(HWND wnd, UINT message, WPARAM wParam, LPARAM lParam);
 	void OnDirectInputKeys(const std::array<uint8_t, 256> &Keys);
+	bool IsInit();
 };
 
 extern std::unique_ptr<REFramework> gREFramework;

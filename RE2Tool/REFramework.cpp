@@ -1,10 +1,11 @@
 #include "REFramework.h"
 
-std::unique_ptr<REFramework> gREFramework {};
+std::unique_ptr<REFramework> gREFramework;
 
 REFramework::REFramework()
 {
 	mInit = false;
+	mSetup = false;
 	mStatWnd = false;
 	mWnd = 0;
 	mInputHooked = false;
@@ -12,7 +13,7 @@ REFramework::REFramework()
 	mPtrFW1Factory = nullptr;
 	//mExecMem = nullptr;
 	mLastDmg = 0;
-	mPtrDamageFunction = nullptr;
+	//mPtrDamageFunction = nullptr;
 
 	ZeroMemory(&mFontParams, sizeof(FW1_FONTWRAPPERCREATEPARAMS));
 	mFontParams.GlyphSheetWidth = 512;
@@ -37,17 +38,19 @@ REFramework::REFramework()
 
 	if (!InitializeCriticalSectionAndSpinCount(&mCSInput, DEFAULT_SPINCOUNT))
 	{
-		std::cout << "Failed to initialize critical section." << std::endl;
+		MessageBox(0, "Failed to initialize critical section.", "RE2Tool", MB_ICONERROR);
+		return;
 	}
 
 	if (!InitializeCriticalSectionAndSpinCount(&mCSData, DEFAULT_SPINCOUNT))
 	{
-		std::cout << "Failed to initialize critical section." << std::endl;
+		MessageBox(0, "Failed to initialize critical section.", "RE2Tool", MB_ICONERROR);
+		return;
 	}
 
 	// Initialize virtual memory pointers
 	HMODULE BaseModuleAddr = GetModuleHandle(0);
-	//mVDIsInControl.SetDataPtr(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70B0E90, {0x408, 0xD8, 0x18, 0x20, 0x130});
+	
 	mVDIsInControl.SetDataPtr (reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x707C0C0, {0x140, 0xF8, 0x10, 0x28, 0x130});
 	mVDActiveTime.SetDataPtr  (reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70B0910, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x18});
 	mVDCutsceneTime.SetDataPtr(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x70B0910, {0x2E0, 0x218, 0x610, 0x710, 0x60, 0x20});
@@ -57,66 +60,42 @@ REFramework::REFramework()
 
 	mEntityMaxHPList.reserve(MAX_ENTITY_COUNT);
 	mEntityHPList.reserve(MAX_ENTITY_COUNT);
+
 	for (DWORD i = 0; i < MAX_ENTITY_COUNT; ++i)
 	{
 		mEntityMaxHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x707C528, {0x260 + (i * 0x8), 0x70, 0x18, 0x288, 0x54}));
 		mEntityHPList.push_back   (VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x707C528, {0x260 + (i * 0x8), 0x70, 0x18, 0x288, 0x58}));
-		//mEntityMaxHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x7081E50, {0x178 + (i * 0x8), 0x18, 0xB8, 0x54}));
-		//mEntityHPList.push_back   (VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x7081E50, {0x178 + (i * 0x8), 0x18, 0xB8, 0x58}));
-		//mEntityMaxHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x7081EA8, {0x80 + (i * 0x8), 0x88, 0x18, 0x1A0, 0x54}));
-		//mEntityHPList.push_back(VirtualData<INT>(reinterpret_cast<BYTE*>(BaseModuleAddr) + 0x7081EA8, {0x80 + (i * 0x8), 0x88, 0x18, 0x1A0, 0x58}));
 	}
 	
 	// hook dmg function
 	std::cout << "Hooking RE2 OnDamageReceived()..." << std::endl;
 	
 	BYTE* ModuleBaseAddr = nullptr;
-	//BYTE* AOBAddr = reinterpret_cast<BYTE*>(0x149FF1CE0);
-	BYTE* AOBAddr = reinterpret_cast<BYTE*>(0x14ACD6FF0);
+	BYTE* AOBAddr = /*reinterpret_cast<BYTE*>(0x14ACD6FF0)*/nullptr;
+	INT iOffset = 0;
 	DWORD dwModuleSize = 0;
 
-	//OnDamageReceived(33);
-
-	//if (memutil::GetModuleInfo(PROCESS_NAME, ModuleBaseAddr, dwModuleSize))
-	//{
-	//	AOBAddr = memutil::AOBScan(ModuleBaseAddr, dwModuleSize, PatternList[SigID::dmg_handle].aobPattern, PatternList[SigID::dmg_handle].dwPatternSize);
-	//	pExecMem = memutil::AllocExecMem(AOB_DETOUR, sizeof(AOB_DETOUR));
-
-	//	intptr_t iJumpParam = reinterpret_cast<intptr_t>(pExecMem);
-	//	memcpy(AOB_JUMP + 2, &iJumpParam, sizeof(intptr_t));
-	//	memutil::PatchExecMemory(AOBAddr, AOB_JUMP, sizeof(AOB_JUMP));
-	//}
-
-	//VirtualFree(pExecMem, 0, MEM_RELEASE);
-
-	if (MH_Initialize() != MH_OK)
+	if (memutil::GetModuleInfo(PROCESS_NAME, ModuleBaseAddr, dwModuleSize))
 	{
-		std::cout << "MH_Initialize failed." << std::endl;
-	}
-	if (MH_CreateHook(AOBAddr, &REFramework::OnDamageReceived, reinterpret_cast<LPVOID*>(&mPtrDamageFunction)) != MH_OK)
-	{
-		std::cout << "MH_CreateHook failed." << std::endl;
-	}
-	if (MH_EnableHook(AOBAddr) != MH_OK)
-	{
-		std::cout << "MH_EnableHook failed." << std::endl;
+		AOBAddr = memutil::AOBScan(ModuleBaseAddr, dwModuleSize, PatternList[SigID::dmg_handle].aobPattern, PatternList[SigID::dmg_handle].dwPatternSize);
+		AOBAddr += PatternList[SigID::dmg_handle].dwOffset;
+
+		iOffset = *reinterpret_cast<INT*>(AOBAddr + 0x1); // relative jump offset
+		AOBAddr += 5; // jump address
+		AOBAddr += iOffset; // final address
+
+		iOffset = *reinterpret_cast<INT*>(AOBAddr + 0x1); // relative jump offset
+		AOBAddr += 5; // jump address
+		AOBAddr += iOffset; // final address
 	}
 
-	//if (memutil::GetModuleInfo(PROCESS_NAME, ModuleBaseAddr, dwModuleSize))
-	//{
-	//	//DmgHandleAddr = memutil::AOBScan(ModuleBaseAddr, dwModuleSize, PatternList[SigID::dmg_handle].aobPattern, PatternList[SigID::dmg_handle].dwPatternSize);
-	//	//DmgHandleAddr = reinterpret_cast<BYTE*>(0x14CA49A70);
-	//	DmgHandleAddr = reinterpret_cast<BYTE*>(&MessageBoxA);
-	//	if (DmgHandleAddr != nullptr)
-	//	{
-	//		mRE2DmgHandle = std::make_unique<FunctionHook>(&MessageBoxA, &DetourFunction);
-	//		ptrMessageBoxA = mRE2DmgHandle->getOriginal<MESSAGEBOXA>();
-	//	}
-	//	else
-	//		std::cout << "AOBScan failed." << std::endl;
-	//}
-	//else
-	//	std::cout << "Failed to get module info." << std::endl;
+	if (AOBAddr == nullptr)
+	{
+		MessageBox(0, "Failed to find the signature of OnDamageReceived().", "RE2Tool", MB_ICONERROR);
+		return;
+	}
+
+	mOnDmgRecvHook = std::make_unique<FunctionHook>(AOBAddr, &REFramework::OnDamageReceived);
 
 	mD3D11Hook = std::make_unique<D3D11Hook>();
 	mD3D11Hook->OnPresent([this](D3D11Hook& hook)
@@ -128,7 +107,13 @@ REFramework::REFramework()
 		OnReset();
 	});
 
-	mD3D11Hook->hook();
+	if (mD3D11Hook->hook() == false)
+	{
+		MessageBox(0, "Failed to hook D3D11.", "RE2Tool", MB_ICONERROR);
+		return;
+	}
+
+	mInit = true;
 }
 
 REFramework::~REFramework()
@@ -138,11 +123,13 @@ REFramework::~REFramework()
 
 	DeleteCriticalSection(&mCSInput);
 	DeleteCriticalSection(&mCSData);
+
+	mOnDmgRecvHook.reset();
 }
 
 bool REFramework::OnMessage(HWND wnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-	if (!mInit)
+	if (!mSetup)
 	{
 		return true;
 	}
@@ -191,6 +178,11 @@ void REFramework::OnDirectInputKeys(const std::array<uint8_t, 256> &Keys)
 	}
 
 	mLastKeys = Keys;
+}
+
+bool REFramework::IsInit()
+{
+	return mInit;
 }
 
 DWORD WINAPI REFramework::StartUpdateDataThread(LPVOID lpParam)
@@ -394,12 +386,12 @@ HRESULT REFramework::InitShaders()
 	return hr;
 }
 
-bool REFramework::Init()
+bool REFramework::Setup()
 {
-	if (mInit)
+	if (mSetup)
 		return true;
 
-	std::cout << "Initializing REFramework..." << std::endl;
+	std::cout << "Setting up REFramework..." << std::endl;
 
 	//if (InitShaders() != S_OK)
 	//{
@@ -412,7 +404,7 @@ bool REFramework::Init()
 
 	if (device == nullptr || swapchain == nullptr)
 	{
-		std::cout << "Device or SwapChain null. DirectX 12 may be in use." << std::endl;
+		MessageBox(0, "Device or SwapChain null. DirectX 12 may be in use.", "RE2Tool", MB_ICONERROR);
 		return false;
 	}
 
@@ -474,19 +466,19 @@ bool REFramework::Init()
 
 	if (!ImGui_ImplWin32_Init(mWnd))
 	{
-		std::cout << "Failed to initialize ImGui." << std::endl;
+		MessageBox(0, "Failed to initialize ImGui.", "RE2Tool", MB_ICONERROR);
 		return false;
 	}
 
 	if (!ImGui_ImplDX11_Init(device, pContext))
 	{
-		std::cout << "Failed to initialize ImGui." << std::endl;
+		MessageBox(0, "Failed to initialize ImGui.", "RE2Tool", MB_ICONERROR);
 		return false;
 	}
 
 	ImGui::StyleColorsDark();
 
-	mInit = true;
+	mSetup = true;
 	mStatWnd = true;
 	mHitmark = true;
 	mResetTimer = false;
@@ -532,9 +524,9 @@ void REFramework::CreateRenderTarget()
 
 void REFramework::OnRender()
 {
-	if (mInit == false)
+	if (mSetup == false)
 	{
-		if (!Init())
+		if (!Setup())
 		{
 			std::cout << "Failed to initialize REFramework." << std::endl;
 			return;
@@ -584,7 +576,7 @@ void REFramework::OnReset()
 		mPtrRenderTargetView->Release();
 		mPtrRenderTargetView = nullptr;
 	}
-	mInit = false;
+	mSetup = false;
 }
 
 void REFramework::DrawUI()
@@ -740,6 +732,7 @@ void REFramework::DrawHitmark(ID3D11DeviceContext* &pContext)
 void WINAPI REFramework::OnDamageReceived(QWORD qwP1, QWORD qwP2, QWORD qwP3)
 {
 	//INT iDamage = *(reinterpret_cast<INT*>(qwP3 + 0x7C));
+	auto OnDmgRecv = (decltype(REFramework::OnDamageReceived)*)gREFramework->mOnDmgRecvHook->getOriginal();
 	INT iDamage = static_cast<INT>(qwP3);
 
 	if (iDamage > 1 || iDamage < 0)
@@ -757,5 +750,6 @@ void WINAPI REFramework::OnDamageReceived(QWORD qwP1, QWORD qwP2, QWORD qwP3)
 		LeaveCriticalSection(&gREFramework->mCSInput);
 	}
 
-	gREFramework->mPtrDamageFunction(qwP1, qwP2, qwP3);
+	//gREFramework->mPtrDamageFunction(qwP1, qwP2, qwP3);
+	OnDmgRecv(qwP1, qwP2, qwP3);
 }

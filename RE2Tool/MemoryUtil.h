@@ -4,6 +4,8 @@
 #include <TlHelp32.h>
 #include <vector>
 
+#define AOB2DWORD(A, B) (((A)[3 + (B)] << 24) | ((A)[2 + (B)] << 16) | ((A)[1 + (B)] << 8) | ((A)[(B)]))
+
 #define PROCESS_NAME "re2.exe"
 #define MAX_BUF_SIZE 32
 #define MAX_ENTITY_COUNT 32
