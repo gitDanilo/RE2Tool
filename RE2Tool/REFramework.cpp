@@ -10,7 +10,7 @@ REFramework::REFramework()
 	mInputHooked = false;
 	mStatWndCorner = 0;
 	mPtrFW1Factory = nullptr;
-	pExecMem = nullptr;
+	//mExecMem = nullptr;
 	mLastDmg = 0;
 	mPtrDamageFunction = nullptr;
 
@@ -184,7 +184,7 @@ void REFramework::OnDirectInputKeys(const std::array<uint8_t, 256> &Keys)
 
 		mHitmark = !mHitmark;
 		if (mHitmark)
-			bResetTimer = true;
+			mResetTimer = true;
 		mDmgList.clear();
 
 		LeaveCriticalSection(&mCSInput);
@@ -489,7 +489,7 @@ bool REFramework::Init()
 	mInit = true;
 	mStatWnd = true;
 	mHitmark = true;
-	bResetTimer = false;
+	mResetTimer = false;
 
 	auto& io = ImGui::GetIO();
 
@@ -542,10 +542,11 @@ void REFramework::OnRender()
 	}
 
 	static ID3D11DeviceContext* pContext = nullptr;
+	//static std::vector<INT> DmgList;
+
 	mD3D11Hook->getDevice()->GetImmediateContext(&pContext);
 
 	//pContext->ClearRenderTargetView(g_mainRenderTargetView, DirectX::Colors::MidnightBlue);
-
 	pContext->OMSetRenderTargets(1, &mPtrRenderTargetView, NULL);
 	pContext->RSSetViewports(1, &mViewport);
 
@@ -559,8 +560,6 @@ void REFramework::OnRender()
 	//context->PSSetShader(mPtrPixelShader, nullptr, 0);
 	//context->Draw(3, 0);
 
-	static bool bHitmark;
-
 	// Draw ImGui
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
@@ -568,16 +567,13 @@ void REFramework::OnRender()
 
 	EnterCriticalSection(&mCSInput);
 	DrawUI();
-	bHitmark = mHitmark;
+	if (mDmgList.empty() == false && mHitmark == true)
+		DrawHitmark(pContext);
 	LeaveCriticalSection(&mCSInput);
 
 	ImGui::EndFrame();
 	ImGui::Render();
-
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
-
-	if (mDmgList.empty() == false && bHitmark == true)
-		DrawHitmark(pContext);
 }
 
 void REFramework::OnReset()
@@ -716,10 +712,10 @@ void REFramework::DrawHitmark(ID3D11DeviceContext* &pContext)
 	static double time_now = 0.0;
 	static double time_diff = 0.0;
 
-	if (time_start == 0.0 || bResetTimer)
+	if (time_start == 0.0 || mResetTimer)
 	{
 		time_start = ImGui::GetTime();
-		bResetTimer = false;
+		mResetTimer = false;
 	}
 	else
 	{

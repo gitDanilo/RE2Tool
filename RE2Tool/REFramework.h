@@ -115,20 +115,17 @@ private:
 	// Font
 	IFW1Factory* mPtrFW1Factory;
 	IFW1FontWrapper* mPtrFontWrapper;
+	FW1_FONTWRAPPERCREATEPARAMS mFontParams;
 
 	//viewport
 	D3D11_VIEWPORT mViewport;
-
-	FW1_FONTWRAPPERCREATEPARAMS mFontParams;
-
-	//std::unique_ptr<FunctionHook> mRE2DmgHandle {};
 
 	// UI
 	CRITICAL_SECTION mCSInput;
 	HWND mWnd;
 	bool mStatWnd;
 	bool mHitmark;
-	bool bResetTimer;
+	bool mResetTimer;
 	int mStatWndCorner;
 	bool mInputHooked;
 	std::array<uint8_t, 256> mLastKeys;
@@ -146,13 +143,13 @@ private:
 	VirtualData<INT> mVDPlayerHP;
 	std::vector<VirtualData<INT>> mEntityMaxHPList;
 	std::vector<VirtualData<INT>> mEntityHPList;
-	
-	LPVOID pExecMem;
 
 	// Hitmark
+	//LPVOID mExecMem;
 	HITM_INFO mHitmInf;
 	HANDLE mUpdateDataThreadHnd;
 	ONDMGFUNCTION mPtrDamageFunction;
+	//std::unique_ptr<FunctionHook> mRE2DmgHandle {};
 	std::vector<INT> mDmgList;
 	INT mLastDmg;
 
