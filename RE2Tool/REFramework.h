@@ -2,7 +2,7 @@
 
 #include <iostream>
 #include <array>
-#include <queue>
+//#include <queue>
 #include <mutex>
 #include <d3d11_1.h>
 #include <d3dcompiler.h>
@@ -18,12 +18,21 @@
 #include "VirtualData.h"
 
 #define STATWND_KEY DIK_INSERT
+#define HITMARK_KEY DIK_DELETE
 #define STATWND_DIST 10.0f
 #define GRAPH_REFRESH_INTERVAL 0.25
+#define HITMARK_DISPLAY_INTERVAL 0.65
 #define START_MAX_FPS 100.0f
 #define MAX_FPS_COUNT 5
 #define UPDATE_DATA_DELAY 50
 #define DEFAULT_SPINCOUNT 0x000032
+#define DMG_LIST_CAPACITY 10
+#define HITMARK_FONT_SIZE 30.0f
+#define HITMARK_X_FACTOR 0.026f
+#define HITMARK_Y_FACTOR 0.065f
+#define HITMARK_FONT_FACTOR 0.028f
+//#define HITMARK_COLOR 0xFF1EFB52
+#define HITMARK_COLOR 0xFFFFFFFF
 
 //typedef int (WINAPI MESSAGEBOXA)(HWND, LPCSTR, LPCSTR, UINT);
 typedef void (WINAPI *ONDMGFUNCTION)(QWORD, QWORD, QWORD);
@@ -33,6 +42,14 @@ struct SimpleVertex
 {
 	DirectX::XMFLOAT3 Pos;
 };
+
+typedef struct _HITM_INFO
+{
+	FLOAT X;
+	FLOAT Y;
+	FLOAT fFontSize;
+	DWORD dwColor;
+} HITM_INFO, *PHITM_INFO;
 
 static BYTE AOB_JUMP[] =
 {
@@ -82,8 +99,6 @@ namespace SigID
 // Commented out in original ImGui code
 IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
-//void WINAPI OnDamageReceived(int iDamage);
-
 class DInputHook;
 
 class REFramework
@@ -112,6 +127,8 @@ private:
 	CRITICAL_SECTION mCSInput;
 	HWND mWnd;
 	bool mStatWnd;
+	bool mHitmark;
+	bool bResetTimer;
 	int mStatWndCorner;
 	bool mInputHooked;
 	std::array<uint8_t, 256> mLastKeys;
@@ -132,9 +149,11 @@ private:
 	
 	LPVOID pExecMem;
 
+	// Hitmark
+	HITM_INFO mHitmInf;
 	HANDLE mUpdateDataThreadHnd;
 	ONDMGFUNCTION mPtrDamageFunction;
-	std::queue<INT> mDmgQueue;
+	std::vector<INT> mDmgList;
 	INT mLastDmg;
 
 	static void WINAPI OnDamageReceived(QWORD qwP1, QWORD qwP2, QWORD qwP3);

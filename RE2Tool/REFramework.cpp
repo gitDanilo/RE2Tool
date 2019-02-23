@@ -24,13 +24,16 @@ REFramework::REFramework()
 	mFontParams.MaxGlyphHeight = 384;
 	mFontParams.DisableGeometryShader = FALSE;
 	mFontParams.VertexBufferSize = 0;
-	mFontParams.DefaultFontParams.pszFontFamily = L"Consolas";
+	//mFontParams.DefaultFontParams.pszFontFamily = L"Consolas";
+	mFontParams.DefaultFontParams.pszFontFamily = L"BankGothic Lt BT";
 	mFontParams.DefaultFontParams.FontWeight = DWRITE_FONT_WEIGHT_BOLD;
 	mFontParams.DefaultFontParams.FontStyle = DWRITE_FONT_STYLE_NORMAL;
 	mFontParams.DefaultFontParams.FontStretch = DWRITE_FONT_STRETCH_NORMAL;
 	mFontParams.DefaultFontParams.pszLocale = L"";
 
 	ZeroMemory(&mREData, sizeof(RE_DATA));
+
+	mDmgList.reserve(DMG_LIST_CAPACITY);
 
 	if (!InitializeCriticalSectionAndSpinCount(&mCSInput, DEFAULT_SPINCOUNT))
 	{
@@ -65,7 +68,7 @@ REFramework::REFramework()
 	}
 	
 	// hook dmg function
-	std::cout << "Hooking RE2 damage function..." << std::endl;
+	std::cout << "Hooking RE2 OnDamageReceived()..." << std::endl;
 	
 	BYTE* ModuleBaseAddr = nullptr;
 	//BYTE* AOBAddr = reinterpret_cast<BYTE*>(0x149FF1CE0);
@@ -172,6 +175,17 @@ void REFramework::OnDirectInputKeys(const std::array<uint8_t, 256> &Keys)
 		}
 		else
 			mStatWnd = true;
+
+		LeaveCriticalSection(&mCSInput);
+	}
+	else if (Keys[HITMARK_KEY] && mLastKeys[HITMARK_KEY] == 0)
+	{
+		EnterCriticalSection(&mCSInput);
+
+		mHitmark = !mHitmark;
+		if (mHitmark)
+			bResetTimer = true;
+		mDmgList.clear();
 
 		LeaveCriticalSection(&mCSInput);
 	}
@@ -424,6 +438,14 @@ bool REFramework::Init()
 	mViewport.TopLeftX = 0.0f;
 	mViewport.TopLeftY = 0.0f;
 
+	mHitmInf.X = (mViewport.Width / 2.0f) + (mViewport.Width * HITMARK_X_FACTOR);
+	mHitmInf.Y = (mViewport.Height / 2.0f) - (mViewport.Height * HITMARK_Y_FACTOR);
+	mHitmInf.fFontSize = HITMARK_FONT_FACTOR * mViewport.Height;
+	mHitmInf.dwColor = HITMARK_COLOR;
+
+	//((mViewport.Width / 2.0f) + HITMARK_X_OFFSET)
+	//((mViewport.Height / 2.0f) - (HITMARK_Y_OFFSET + (i * HITMARK_FONT_SIZE)))
+
 	if (mPtrFW1Factory == nullptr)
 	{
 		FW1CreateFactory(FW1_VERSION, &mPtrFW1Factory);
@@ -466,6 +488,8 @@ bool REFramework::Init()
 
 	mInit = true;
 	mStatWnd = true;
+	mHitmark = true;
+	bResetTimer = false;
 
 	auto& io = ImGui::GetIO();
 
@@ -523,9 +547,7 @@ void REFramework::OnRender()
 	//pContext->ClearRenderTargetView(g_mainRenderTargetView, DirectX::Colors::MidnightBlue);
 
 	pContext->OMSetRenderTargets(1, &mPtrRenderTargetView, NULL);
-
-	//pContext->RSSetViewports(1, &mViewport);
-	//DrawHitmark(pContext);
+	pContext->RSSetViewports(1, &mViewport);
 
 	// Draw triangle
 	//context->IASetInputLayout(g_pVertexLayout);
@@ -537,6 +559,8 @@ void REFramework::OnRender()
 	//context->PSSetShader(mPtrPixelShader, nullptr, 0);
 	//context->Draw(3, 0);
 
+	static bool bHitmark;
+
 	// Draw ImGui
 	ImGui_ImplDX11_NewFrame();
 	ImGui_ImplWin32_NewFrame();
@@ -544,12 +568,16 @@ void REFramework::OnRender()
 
 	EnterCriticalSection(&mCSInput);
 	DrawUI();
+	bHitmark = mHitmark;
 	LeaveCriticalSection(&mCSInput);
 
 	ImGui::EndFrame();
 	ImGui::Render();
 
 	ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
+	if (mDmgList.empty() == false && bHitmark == true)
+		DrawHitmark(pContext);
 }
 
 void REFramework::OnReset()
@@ -636,11 +664,26 @@ void REFramework::DrawUI()
 				if (ImGui::CollapsingHeader("General info", ImGuiTreeNodeFlags_DefaultOpen))
 				{
 					TmpData.GetFormatedTime(buf);
-					ImGui::Text("Time  : %s", buf);
-					ImGui::Text("Damage: %i", mLastDmg);
-					ImGui::Text("Health:");
+					ImGui::Text("Time   :");
 					ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+					ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), buf);
 
+					ImGui::Text("Hitmark:");
+					ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+					if (mHitmark)
+						ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "ON");
+					else
+						ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "OFF");
+
+					ImGui::Text("Damage :");
+					ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+					if (mLastDmg > 0)
+						ImGui::TextColored(ImVec4(0.0f, 1.0f, 0.0f, 1.0f), "%i", mLastDmg);
+					else
+						ImGui::TextColored(ImVec4(1.0f, 0.0f, 0.0f, 1.0f), "%i", mLastDmg);
+
+					ImGui::Text("Health :");
+					ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
 					sprintf_s(buf, "%d/%d", TmpData.iPlayerHP, TmpData.iPlayerMaxHP);
 					fProgress = static_cast<float>(TmpData.iPlayerHP) / static_cast<float>(TmpData.iPlayerMaxHP);
 					ImGui::ProgressBar(fProgress, ImVec2(-1.0f, 15.0f), buf);
@@ -668,8 +711,34 @@ void REFramework::DrawUI()
 
 void REFramework::DrawHitmark(ID3D11DeviceContext* &pContext)
 {
-	// Color = ABGR
-	mPtrFontWrapper->DrawString(pContext, L"200", 20.0f, ((mViewport.Width / 2.0f) - 0), ((mViewport.Height / 2.0f) - 50.0f), 0xFF1EFB52, FW1_RESTORESTATE);
+	static wchar_t buf[MAX_BUF_SIZE];
+	static double time_start = 0.0;
+	static double time_now = 0.0;
+	static double time_diff = 0.0;
+
+	if (time_start == 0.0 || bResetTimer)
+	{
+		time_start = ImGui::GetTime();
+		bResetTimer = false;
+	}
+	else
+	{
+		time_now = ImGui::GetTime();
+		time_diff = time_now - time_start;
+		if (time_diff >= HITMARK_DISPLAY_INTERVAL)
+		{
+			mDmgList.clear();
+			time_start = 0.0;
+			return;
+		}
+	}
+
+	static int i;
+	for (i = static_cast<int>(mDmgList.size() - 1); i > -1; --i)
+	{
+		swprintf_s(buf, L"%i", mDmgList[i]);
+		mPtrFontWrapper->DrawString(pContext, buf, mHitmInf.fFontSize, mHitmInf.X, mHitmInf.Y - (mHitmInf.fFontSize * i), mHitmInf.dwColor, FW1_RESTORESTATE);
+	}
 }
 
 void WINAPI REFramework::OnDamageReceived(QWORD qwP1, QWORD qwP2, QWORD qwP3)
@@ -680,7 +749,17 @@ void WINAPI REFramework::OnDamageReceived(QWORD qwP1, QWORD qwP2, QWORD qwP3)
 	if (iDamage > 1 || iDamage < 0)
 	{
 		gREFramework->mLastDmg = iDamage;
-		std::cout << "Last damage: " << std::dec << iDamage << std::endl;
+
+		EnterCriticalSection(&gREFramework->mCSInput);
+
+		if (gREFramework->mHitmark)
+		{
+			if (gREFramework->mDmgList.size() == DMG_LIST_CAPACITY)
+				gREFramework->mDmgList.clear();
+			gREFramework->mDmgList.push_back(iDamage);
+		}
+
+		LeaveCriticalSection(&gREFramework->mCSInput);
 	}
 
 	gREFramework->mPtrDamageFunction(qwP1, qwP2, qwP3);
