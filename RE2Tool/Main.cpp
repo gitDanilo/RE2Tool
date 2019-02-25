@@ -33,7 +33,7 @@ DWORD WINAPI StartupThread()
 	if (GetSystemDirectoryW(buffer, MAX_PATH) == 0)
 		failedMsg();
 
-	gDinput = LoadLibraryW((std::wstring {buffer} + L"\\dinput8.dll").c_str());
+	gDinput = LoadLibraryW((std::wstring{buffer} + L"\\dinput8.dll").c_str());
 	if (gDinput == NULL)
 		failedMsg();
 

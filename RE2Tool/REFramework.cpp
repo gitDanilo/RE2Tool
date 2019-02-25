@@ -490,6 +490,7 @@ bool REFramework::Setup()
 	io.WantCaptureKeyboard = false;
 	io.WantCaptureMouse = false;
 	io.MouseDrawCursor = false;
+
 	io.ConfigFlags = ImGuiConfigFlags_NoMouse;
 
 	mDInputHook->acknowledgeInput();
