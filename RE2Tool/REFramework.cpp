@@ -178,28 +178,28 @@ void REFramework::OnDirectInputKeys(const std::array<uint8_t, 256> &Keys)
 	}
 	else if (Keys[CONFIGWND_KEY] && mLastKeys[CONFIGWND_KEY] == 0)
 	{
-		EnterCriticalSection(&mCSInput);
+		//EnterCriticalSection(&mCSInput);
 
-		auto& io = ImGui::GetIO();
-		mConfigWnd = !mConfigWnd;
-		if (mConfigWnd)
-		{
-			io.WantCaptureMouse = true;
-			io.WantCaptureKeyboard = true;
-			io.MouseDrawCursor = true;
+		//auto& io = ImGui::GetIO();
+		//mConfigWnd = !mConfigWnd;
+		//if (mConfigWnd)
+		//{
+		//	io.WantCaptureMouse = true;
+		//	io.WantCaptureKeyboard = true;
+		//	io.MouseDrawCursor = true;
 
-			io.ConfigFlags = ImGuiConfigFlags_None;
-		}
-		else
-		{
-			io.WantCaptureMouse = false;
-			io.WantCaptureKeyboard = false;
-			io.MouseDrawCursor = false;
+		//	io.ConfigFlags = ImGuiConfigFlags_None;
+		//}
+		//else
+		//{
+		//	io.WantCaptureMouse = false;
+		//	io.WantCaptureKeyboard = false;
+		//	io.MouseDrawCursor = false;
 
-			io.ConfigFlags = ImGuiConfigFlags_NoMouse;
-		}
+		//	io.ConfigFlags = ImGuiConfigFlags_NoMouse;
+		//}
 
-		LeaveCriticalSection(&mCSInput);
+		//LeaveCriticalSection(&mCSInput);
 	}
 	mLastKeys = Keys;
 }
