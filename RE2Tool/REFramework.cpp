@@ -7,6 +7,7 @@ REFramework::REFramework()
 	mInit = false;
 	mSetup = false;
 	mStatWnd = false;
+	mConfigWnd = false;
 	mWnd = 0;
 	mInputHooked = false;
 	mStatWndCorner = 0;
@@ -135,7 +136,7 @@ bool REFramework::OnMessage(HWND wnd, UINT message, WPARAM wParam, LPARAM lParam
 		return true;
 	}
 
-	if (mStatWnd && ImGui_ImplWin32_WndProcHandler(wnd, message, wParam, lParam) != 0)
+	if (mConfigWnd && ImGui_ImplWin32_WndProcHandler(wnd, message, wParam, lParam) != 0)
 	{
 		// If the user is interacting with the UI we block the message from going to the game.
 		auto& io = ImGui::GetIO();
@@ -155,12 +156,9 @@ void REFramework::OnDirectInputKeys(const std::array<uint8_t, 256> &Keys)
 	{
 		EnterCriticalSection(&mCSInput);
 
-		++mStatWndCorner;
-		if (mStatWndCorner > 3)
-		{
-			mStatWndCorner = -1;
+		mStatWndCorner = (mStatWndCorner + 1) % 5;
+		if (mStatWndCorner == 4)
 			mStatWnd = false;
-		}
 		else
 			mStatWnd = true;
 
@@ -178,7 +176,31 @@ void REFramework::OnDirectInputKeys(const std::array<uint8_t, 256> &Keys)
 
 		LeaveCriticalSection(&mCSInput);
 	}
+	else if (Keys[CONFIGWND_KEY] && mLastKeys[CONFIGWND_KEY] == 0)
+	{
+		EnterCriticalSection(&mCSInput);
 
+		auto& io = ImGui::GetIO();
+		mConfigWnd = !mConfigWnd;
+		if (mConfigWnd)
+		{
+			io.WantCaptureMouse = true;
+			io.WantCaptureKeyboard = true;
+			io.MouseDrawCursor = true;
+
+			io.ConfigFlags = ImGuiConfigFlags_None;
+		}
+		else
+		{
+			io.WantCaptureMouse = false;
+			io.WantCaptureKeyboard = false;
+			io.MouseDrawCursor = false;
+
+			io.ConfigFlags = ImGuiConfigFlags_NoMouse;
+		}
+
+		LeaveCriticalSection(&mCSInput);
+	}
 	mLastKeys = Keys;
 }
 
@@ -483,6 +505,7 @@ bool REFramework::Setup()
 	mSetup = true;
 	mStatWnd = true;
 	mHitmark = true;
+	mConfigWnd = false;
 	mResetTimer = false;
 
 	auto& io = ImGui::GetIO();
@@ -584,20 +607,132 @@ void REFramework::OnReset()
 
 void REFramework::DrawUI()
 {
+	static ImVec2 WndPos;
+	static ImVec2 WndPosPivot;
+	static float fWidth = 0;
+
 	auto& io = ImGui::GetIO();
 	auto& style = ImGui::GetStyle();
 
-	if (mStatWnd && mStatWndCorner != -1)
+	if (mConfigWnd)
 	{
-		ImVec2 WndPos = ImVec2((mStatWndCorner & 1) ? io.DisplaySize.x - STATWND_DIST : STATWND_DIST, (mStatWndCorner & 2) ? io.DisplaySize.y - STATWND_DIST : STATWND_DIST);
-		ImVec2 WndPosPivot = ImVec2((mStatWndCorner & 1) ? 1.0f : 0.0f, (mStatWndCorner & 2) ? 1.0f : 0.0f);
+		fWidth = 365.0f * io.FontGlobalScale;
+
+		WndPos = ImVec2((io.DisplaySize.x / 2.0f) - (fWidth / 2.0f), io.DisplaySize.y / 2.0f);
+		WndPosPivot = ImVec2(0.0f, 1.0f);
 
 		style.FrameRounding = 2.0f;
-		ImGui::SetNextWindowSize(ImVec2(215.0f, 0.0f));
+		ImGui::SetNextWindowSize(ImVec2(fWidth, 0.0f));
 		ImGui::SetNextWindowBgAlpha(0.30f);
 		ImGui::SetNextWindowPos(WndPos, ImGuiCond_Always, WndPosPivot);
 
-		if (ImGui::Begin("RE2Tool", &mStatWnd, (mStatWndCorner != -1 ? ImGuiWindowFlags_NoMove : 0) | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav))
+		if (ImGui::Begin("RE2Tool - Configuration", &mConfigWnd, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav))
+		{
+			if (ImGui::CollapsingHeader("Configuration", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				static bool test1 = false;
+				static bool test2 = false;
+				static bool test3 = false;
+				static float test4 = 0;
+
+				ImGui::Combo("Position", &mStatWndCorner, "Top left\0Top right\0Bottom left\0Bottom right\0Disabled\0\0");
+				ImGui::Checkbox("Game performance", &test1);
+				ImGui::Checkbox("General info", &test2);
+				ImGui::Checkbox("Entities list", &test3);
+				ImGui::DragFloat("HUD scale", &io.FontGlobalScale, 0.005f, 0.60f, 2.0f, "%.2f");
+				ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+				ImGui::TextDisabled("(?)");
+				if (ImGui::IsItemHovered())
+				{
+					ImGui::BeginTooltip();
+					ImGui::PushTextWrapPos(ImGui::GetFontSize() * 30.0f);
+					ImGui::Text("Change the HUD scale by clicking and draging to the left or right");
+					ImGui::PopTextWrapPos();
+					ImGui::EndTooltip();
+				}
+			}
+
+			if (ImGui::CollapsingHeader("Style", ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				static int iColor;
+				static float HitmarkColor[4];
+
+				ImGui::ColorEdit4("##color", HitmarkColor, ImGuiColorEditFlags_AlphaBar);
+				ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+				ImGui::Text("Hitmark");
+
+				iColor = 0;
+				ImGui::PushID(iColor);
+				ImGui::ColorEdit4("##color", reinterpret_cast<float*>(&style.Colors[iColor]), ImGuiColorEditFlags_AlphaBar);
+				ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+				ImGui::Text("Text");
+				ImGui::PopID();
+
+				iColor = 24;
+				ImGui::PushID(iColor);
+				ImGui::ColorEdit4("##color", reinterpret_cast<float*>(&style.Colors[iColor]), ImGuiColorEditFlags_AlphaBar);
+				ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+				ImGui::Text("Header");
+				ImGui::PopID();
+
+				//iColor = 25;
+				//ImGui::PushID(iColor);
+				//ImGui::ColorEdit4("##color", reinterpret_cast<float*>(&style.Colors[iColor]), ImGuiColorEditFlags_AlphaBar);
+				//ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+				//ImGui::Text("Header hovered");
+				//ImGui::PopID();
+
+				iColor = 40;
+				ImGui::PushID(iColor);
+				ImGui::ColorEdit4("##color", reinterpret_cast<float*>(&style.Colors[iColor]), ImGuiColorEditFlags_AlphaBar);
+				ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+				ImGui::Text("Health bar");
+				ImGui::PopID();
+
+				iColor = 7;
+				ImGui::PushID(iColor);
+				ImGui::ColorEdit4("##color", reinterpret_cast<float*>(&style.Colors[iColor]), ImGuiColorEditFlags_AlphaBar);
+				ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+				ImGui::Text("Widgets background");
+				ImGui::PopID();
+
+				iColor = 38;
+				ImGui::PushID(iColor);
+				ImGui::ColorEdit4("##color", reinterpret_cast<float*>(&style.Colors[iColor]), ImGuiColorEditFlags_AlphaBar);
+				ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+				ImGui::Text("Graph line");
+				ImGui::PopID();
+
+				//iColor = 18;
+				//ImGui::PushID(iColor);
+				//ImGui::ColorEdit4("##color", reinterpret_cast<float*>(&style.Colors[iColor]), ImGuiColorEditFlags_AlphaBar);
+				//ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+				//ImGui::Text("Check mark");
+				//ImGui::PopID();
+
+				//iColor = 22;
+				//ImGui::PushID(iColor);
+				//ImGui::ColorEdit4("##color", reinterpret_cast<float*>(&style.Colors[iColor]), ImGuiColorEditFlags_AlphaBar);
+				//ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
+				//ImGui::Text("Check mark hovered");
+				//ImGui::PopID();
+			}
+
+			ImGui::End();
+		}
+	}
+
+	if (mStatWnd && mStatWndCorner != 4)
+	{
+		WndPos = ImVec2((mStatWndCorner & 1) ? io.DisplaySize.x - STATWND_DIST : STATWND_DIST, (mStatWndCorner & 2) ? io.DisplaySize.y - STATWND_DIST : STATWND_DIST);
+		WndPosPivot = ImVec2((mStatWndCorner & 1) ? 1.0f : 0.0f, (mStatWndCorner & 2) ? 1.0f : 0.0f);
+
+		style.FrameRounding = 2.0f;
+		ImGui::SetNextWindowSize(ImVec2(210.0f * io.FontGlobalScale, 0.0f));
+		ImGui::SetNextWindowBgAlpha(0.30f);
+		ImGui::SetNextWindowPos(WndPos, ImGuiCond_Always, WndPosPivot);
+
+		if (ImGui::Begin("RE2Tool", &mStatWnd, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav))
 		{
 			static RE_DATA TmpData;
 			static char buf[MAX_BUF_SIZE];
@@ -639,7 +774,7 @@ void REFramework::DrawUI()
 					}
 				}
 				sprintf_s(buf, "fps: %.2f", fps);
-				ImGui::PlotLines("", fps_list, IM_ARRAYSIZE(fps_list), list_index, buf, 0.0f, max_fps, ImVec2(198.0f, 60.0f), 4, true);
+				ImGui::PlotLines("", fps_list, IM_ARRAYSIZE(fps_list), list_index, buf, 0.0f, max_fps, ImVec2(/*198.0f * io.FontGlobalScale*/0, 62.0f * io.FontGlobalScale), 4, true);
 			}
 
 			EnterCriticalSection(&mCSData);
@@ -657,7 +792,8 @@ void REFramework::DrawUI()
 					TmpData.GetFormatedTime(buf);
 					ImGui::Text("Time   :");
 					ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
-					ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), buf);
+					//ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f), buf);
+					ImGui::Text(buf);
 
 					ImGui::Text("Hitmark:");
 					ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
@@ -677,7 +813,7 @@ void REFramework::DrawUI()
 					ImGui::SameLine(0.0f, ImGui::GetStyle().ItemInnerSpacing.x);
 					sprintf_s(buf, "%d/%d", TmpData.iPlayerHP, TmpData.iPlayerMaxHP);
 					fProgress = static_cast<float>(TmpData.iPlayerHP) / static_cast<float>(TmpData.iPlayerMaxHP);
-					ImGui::ProgressBar(fProgress, ImVec2(-1.0f, 15.0f), buf);
+					ImGui::ProgressBar(fProgress, ImVec2(-1.0f, 15.0f * io.FontGlobalScale), buf);
 				}
 
 				if (TmpData.iEntityCount > 0)
@@ -691,7 +827,7 @@ void REFramework::DrawUI()
 					{
 						sprintf_s(buf, "%d/%d", TmpData.EntityHPList[i], TmpData.EntityMaxHPList[i]);
 						fProgress = static_cast<float>(TmpData.EntityHPList[i]) / static_cast<float>(TmpData.EntityMaxHPList[i]);
-						ImGui::ProgressBar(fProgress, ImVec2(-1.0f, 15.0f), buf);
+						ImGui::ProgressBar(fProgress, ImVec2(-1.0f, 15.0f * io.FontGlobalScale), buf);
 					}
 				}
 			}

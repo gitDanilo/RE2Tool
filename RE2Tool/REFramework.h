@@ -17,6 +17,7 @@
 
 #define STATWND_KEY DIK_INSERT
 #define HITMARK_KEY DIK_DELETE
+#define CONFIGWND_KEY DIK_HOME
 #define STATWND_DIST 10.0f
 #define GRAPH_REFRESH_INTERVAL 0.25
 #define HITMARK_DISPLAY_INTERVAL 0.65
@@ -106,6 +107,7 @@ private:
 	HWND mWnd;
 	bool mStatWnd;
 	bool mHitmark;
+	bool mConfigWnd;
 	bool mResetTimer;
 	int mStatWndCorner;
 	bool mInputHooked;
